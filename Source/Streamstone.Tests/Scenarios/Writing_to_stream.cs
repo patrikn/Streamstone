@@ -14,7 +14,7 @@ namespace Streamstone.Scenarios
     public class Writing_to_stream
     {
         Partition partition;
-        CloudTable table;
+        ITable table;
 
         [SetUp]
         public void SetUp()
@@ -49,7 +49,7 @@ namespace Streamstone.Scenarios
             {
                 Assert.ThrowsAsync<ConcurrencyConflictException>(
                     async ()=> await Stream.WriteAsync(stream, @event));
-                
+
                 contents.AssertNothingChanged();
             });
         }
@@ -81,7 +81,7 @@ namespace Streamstone.Scenarios
                 Assert.ThrowsAsync<DuplicateEventException>(
                     async () => await Stream.WriteAsync(stream, CreateEvent("e3"), duplicate));
 
-                contents.AssertNothingChanged();  
+                contents.AssertNothingChanged();
             });
         }
 
@@ -104,7 +104,7 @@ namespace Streamstone.Scenarios
 
             var eventEntities = partition.RetrieveEventEntities();
             Assert.That(eventEntities.Length, Is.EqualTo(2));
-            
+
             AssertEventEntity(1, eventEntities[0]);
             AssertEventEntity(2, eventEntities[1]);
 
@@ -114,7 +114,7 @@ namespace Streamstone.Scenarios
             AssertEventIdEntity("e1", 1, eventIdEntities[0]);
             AssertEventIdEntity("e2", 2, eventIdEntities[1]);
 
-            Assert.That(partition.RetrieveAll().Count, 
+            Assert.That(partition.RetrieveAll<object>().Count,
                 Is.EqualTo(eventEntities.Length + eventIdEntities.Length + 1));
         }
 
@@ -145,7 +145,7 @@ namespace Streamstone.Scenarios
             AssertEventIdEntity("e1", 1, eventIdEntities[0]);
             AssertEventIdEntity("e2", 2, eventIdEntities[1]);
 
-            Assert.That(partition.RetrieveAll().Count,
+            Assert.That(partition.RetrieveAll<object>().Count,
                 Is.EqualTo(eventEntities.Length + eventIdEntities.Length + 1));
         }
 
@@ -175,7 +175,7 @@ namespace Streamstone.Scenarios
             var eventIdEntities = partition.RetrieveEventIdEntities();
             Assert.That(eventIdEntities.Length, Is.EqualTo(0));
 
-            Assert.That(partition.RetrieveAll().Count,
+            Assert.That(partition.RetrieveAll<object>().Count,
                 Is.EqualTo(eventEntities.Length + 1));
         }
 
@@ -195,7 +195,7 @@ namespace Streamstone.Scenarios
 
             AssertNewStream(result, 2, properties);
             AssertStreamEntity(2, properties);
-            
+
             var storedEvents = result.Events;
             Assert.That(storedEvents.Length, Is.EqualTo(2));
 
@@ -214,7 +214,7 @@ namespace Streamstone.Scenarios
             AssertEventIdEntity("e1", 1, eventIdEntities[0]);
             AssertEventIdEntity("e2", 2, eventIdEntities[1]);
 
-            Assert.That(partition.RetrieveAll().Count,
+            Assert.That(partition.RetrieveAll<object>().Count,
                 Is.EqualTo(eventEntities.Length + eventIdEntities.Length + 1));
         }
 
@@ -267,7 +267,7 @@ namespace Streamstone.Scenarios
 
             expectedVersion = 0;
 
-            Assert.ThrowsAsync<ConcurrencyConflictException>(async ()=> await 
+            Assert.ThrowsAsync<ConcurrencyConflictException>(async ()=> await
                 Stream.WriteAsync(partition, expectedVersion, CreateEvent("e1"), CreateEvent("e2")));
         }
 
@@ -337,15 +337,15 @@ namespace Streamstone.Scenarios
             var actualStreamEntity = partition.RetrieveStreamEntity();
 
             Assert.That(actualStream.ETag, Is.Not.EqualTo(previous.ETag));
-            
+
             var expectedStream = CreateStream(version, actualStreamEntity.ETag);
             expectedStream.ToExpectedObject().ShouldEqual(actualStream);
         }
 
         Stream CreateStream(int version, string etag, object properties = null)
         {
-            var props = properties != null  
-                ? StreamProperties.From(properties) 
+            var props = properties != null
+                ? StreamProperties.From(properties)
                 : StreamProperties.None;
 
             return new Stream(partition, etag, version, props);
@@ -408,8 +408,8 @@ namespace Streamstone.Scenarios
                 {"Data", new EntityProperty("{}")}
             };
 
-            var eventId = id != null 
-                ? EventId.From(id) 
+            var eventId = id != null
+                ? EventId.From(id)
                 : EventId.None;
 
             return new EventData(eventId, EventProperties.From(properties));

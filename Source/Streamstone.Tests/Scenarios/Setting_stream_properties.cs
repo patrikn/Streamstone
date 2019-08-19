@@ -8,13 +8,15 @@ using NUnit.Framework;
 
 using Microsoft.Azure.Cosmos.Table;
 
+using StreamStone;
+
 namespace Streamstone.Scenarios
 {
     [TestFixture]
     public class Setting_stream_properties
     {
         Partition partition;
-        CloudTable table;
+        ITable table;
 
         [SetUp]
         public void SetUp()
@@ -30,10 +32,10 @@ namespace Streamstone.Scenarios
 
             var previous = await Stream.ProvisionAsync(partition);
             var current  = await Stream.SetPropertiesAsync(previous, StreamProperties.From(properties));
-            
+
             Assert.That(current.ETag, Is.Not.EqualTo(previous.ETag));
             StreamProperties.From(properties).ToExpectedObject().ShouldEqual(current.Properties);
-        } 
+        }
 
         [Test]
         public async Task When_concurrency_conflict()
@@ -74,7 +76,7 @@ namespace Streamstone.Scenarios
         [Test]
         public void When_trying_to_set_properties_on_transient_stream()
         {
-            var stream = new Stream(partition);           
+            var stream = new Stream(partition);
 
             partition.CaptureContents(contents =>
             {

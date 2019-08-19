@@ -13,7 +13,7 @@ namespace Streamstone.Scenarios
     public class Reading_from_stream
     {
         Partition partition;
-        CloudTable table;
+        ITable table;
 
         [SetUp]
         public void SetUp()
@@ -44,11 +44,11 @@ namespace Streamstone.Scenarios
             await Stream.ProvisionAsync(partition);
 
             var slice = await Stream.ReadAsync<TestEventEntity>(partition);
-            
+
             Assert.That(slice.IsEndOfStream, Is.True);
             Assert.That(slice.Events.Length, Is.EqualTo(0));
         }
-        
+
         [Test]
         public async Task When_version_is_greater_than_current_version_of_stream()
         {
@@ -56,7 +56,7 @@ namespace Streamstone.Scenarios
             await Stream.WriteAsync(new Stream(partition), events);
 
             var slice = await Stream.ReadAsync<TestEventEntity>(partition, events.Length + 1);
-            
+
             Assert.That(slice.IsEndOfStream, Is.True);
             Assert.That(slice.Events.Length, Is.EqualTo(0));
         }
@@ -80,7 +80,7 @@ namespace Streamstone.Scenarios
             await Stream.WriteAsync(new Stream(partition), events);
 
             var slice = await Stream.ReadAsync<TestRecordedEventEntity>(partition, sliceSize: 1);
-            
+
             Assert.That(slice.IsEndOfStream, Is.False);
             Assert.That(slice.Events.Length, Is.EqualTo(1));
             Assert.That(slice.Events[0].Version, Is.EqualTo(1));

@@ -14,7 +14,7 @@ namespace Streamstone.Scenarios
     public class Provisioning_stream
     {
         Partition partition;
-        CloudTable table;
+        ITable table;
 
         [SetUp]
         public void SetUp()
@@ -37,7 +37,7 @@ namespace Streamstone.Scenarios
         {
             var stream = await Stream.ProvisionAsync(partition);
             var entity = partition.RetrieveStreamEntity();
-            
+
             var expectedStream = new Stream(partition, entity.ETag, 0, StreamProperties.None);
             expectedStream.ToExpectedObject().ShouldEqual(stream);
 
@@ -65,7 +65,7 @@ namespace Streamstone.Scenarios
             var expectedStream = new Stream
             (
                 partition,
-                entity.ETag, 0, 
+                entity.ETag, 0,
                 StreamProperties.From(properties)
             );
 

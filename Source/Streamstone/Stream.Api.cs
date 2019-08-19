@@ -39,7 +39,7 @@ namespace Streamstone
         /// </exception>
         /// <exception cref="ConcurrencyConflictException">
         /// If stream already exists in the partition
-        /// </exception>        
+        /// </exception>
         public static Task<Stream> ProvisionAsync(Partition partition, StreamProperties properties)
         {
             return ProvisionAsync(new Stream(partition, properties));
@@ -68,7 +68,7 @@ namespace Streamstone
         /// <param name="stream">The stream header.</param>
         /// <param name="events">The events to write.</param>
         /// <returns>
-        ///     The promise, that wil eventually return the result of the stream write operation 
+        ///     The promise, that wil eventually return the result of the stream write operation
         ///     containing updated stream header or will fail with exception
         /// </returns>
         /// <exception cref="ArgumentNullException">
@@ -89,7 +89,7 @@ namespace Streamstone
         /// <exception cref="ConcurrencyConflictException">
         ///     If write operation has conflicts
         /// </exception>
-        public static Task<StreamWriteResult> WriteAsync(Stream stream, params EventData[] events) => 
+        public static Task<StreamWriteResult> WriteAsync(Stream stream, params EventData[] events) =>
             WriteAsync(stream, StreamWriteOptions.Default, events);
 
         /// <summary>
@@ -99,7 +99,7 @@ namespace Streamstone
         /// <param name="options">The stream write options.</param>
         /// <param name="events">The events to write.</param>
         /// <returns>
-        ///     The promise, that wil eventually return the result of the stream write operation 
+        ///     The promise, that wil eventually return the result of the stream write operation
         ///     containing updated stream header or will fail with exception
         /// </returns>
         /// <exception cref="ArgumentNullException">
@@ -150,7 +150,7 @@ namespace Streamstone
         /// </exception>
         /// <exception cref="ArgumentOutOfRangeException">
         ///    If <paramref name="expectedVersion"/> is less than 0
-        /// </exception> 
+        /// </exception>
         /// <exception cref="ArgumentOutOfRangeException">
         ///    If <paramref name="events"/> array is empty
         /// </exception>
@@ -166,8 +166,8 @@ namespace Streamstone
         public static async Task<StreamWriteResult> WriteAsync(Partition partition, int expectedVersion, params EventData[] events)
         {
             return await WriteAsync(partition, StreamWriteOptions.Default, expectedVersion, events);
-        } 
-        
+        }
+
         /// <summary>
         /// Initiates an asynchronous operation that writes the given array of events to a partition using specified expected version.
         /// </summary>
@@ -187,7 +187,7 @@ namespace Streamstone
         /// </exception>
         /// <exception cref="ArgumentOutOfRangeException">
         ///    If <paramref name="expectedVersion"/> is less than 0
-        /// </exception> 
+        /// </exception>
         /// <exception cref="ArgumentOutOfRangeException">
         ///    If <paramref name="events"/> array is empty
         /// </exception>
@@ -214,7 +214,7 @@ namespace Streamstone
 
             return await WriteAsync(stream, options, events);
         }
-        
+
         /// <summary>
         /// Initiates an asynchronous operation that sets the given stream properties (metadata).
         /// </summary>
@@ -272,7 +272,7 @@ namespace Streamstone
         /// </summary>
         /// <param name="partition">The partition.</param>
         /// <returns>
-        ///     The promise, that wil eventually return the result of stream open operation, 
+        ///     The promise, that wil eventually return the result of stream open operation,
         ///     which could be further examined for stream existence;  or wil fail with exception
         /// </returns>
         /// <exception cref="ArgumentNullException">
@@ -311,7 +311,7 @@ namespace Streamstone
         /// <param name="startVersion">The start version.</param>
         /// <param name="sliceSize">Size of the slice.</param>
         /// <returns>
-        ///     The promise, that wil eventually return the slice of the stream, 
+        ///     The promise, that wil eventually return the slice of the stream,
         ///     which contains events that has been read; or will fail with exception
         /// </returns>
         /// <exception cref="ArgumentNullException">
@@ -322,14 +322,14 @@ namespace Streamstone
         /// </exception>
         /// <exception cref="ArgumentOutOfRangeException">
         ///     If <paramref name="sliceSize"/> &lt; 1
-        /// </exception>       
+        /// </exception>
         /// <exception cref="StreamNotFoundException">
         ///     If there is no stream in a given partition
         /// </exception>
         public static Task<StreamSlice<T>> ReadAsync<T>(
-            Partition partition, 
-            int startVersion = 1, 
-            int sliceSize = DefaultSliceSize) 
+            Partition partition,
+            int startVersion = 1,
+            int sliceSize = DefaultSliceSize)
             where T : class, new()
         {
             Requires.NotNull(partition, nameof(partition));
@@ -337,7 +337,7 @@ namespace Streamstone
             Requires.GreaterThanOrEqualToOne(sliceSize, nameof(sliceSize));
 
             return new ReadOperation<T>(partition, startVersion, sliceSize)
-                .ExecuteAsync(BuildEntity<T>());
+                .ExecuteAsync();
         }
 
         /// <summary>
@@ -347,7 +347,7 @@ namespace Streamstone
         /// <param name="startVersion">The start version.</param>
         /// <param name="sliceSize">Size of the slice.</param>
         /// <returns>
-        ///     The promise, that wil eventually return the slice of the stream, 
+        ///     The promise, that wil eventually return the slice of the stream,
         ///     which contains events that has been read; or will fail with exception
         /// </returns>
         /// <exception cref="ArgumentNullException">
@@ -358,11 +358,11 @@ namespace Streamstone
         /// </exception>
         /// <exception cref="ArgumentOutOfRangeException">
         ///     If <paramref name="sliceSize"/> &lt; 1
-        /// </exception>       
+        /// </exception>
         /// <exception cref="StreamNotFoundException">
         ///     If there is no stream in a given partition
         /// </exception>
-        public static Task<StreamSlice<EventProperties>> ReadAsync(
+        public static async Task<StreamSlice<EventProperties>> ReadAsync(
             Partition partition,
             int startVersion = 1,
             int sliceSize = DefaultSliceSize)
@@ -371,8 +371,11 @@ namespace Streamstone
             Requires.GreaterThanOrEqualToOne(startVersion, nameof(startVersion));
             Requires.GreaterThanOrEqualToOne(sliceSize, nameof(sliceSize));
 
-            return new ReadOperation<EventProperties>(partition, startVersion, sliceSize)
-                .ExecuteAsync(BuildEventProperties);
+            var result = await new ReadOperation<EventEntity>(partition, startVersion, sliceSize)
+                .ExecuteAsync();
+
+            var eventProperties = result.Events.Select(e => e.Properties).ToArray();
+            return new StreamSlice<EventProperties>(result.Stream, eventProperties, result.HasEvents, result.IsEndOfStream);
         }
 
         static Func<DynamicTableEntity, T> BuildEntity<T>() where T : class, new()

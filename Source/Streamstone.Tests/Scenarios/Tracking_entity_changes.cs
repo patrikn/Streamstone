@@ -8,6 +8,8 @@ using Microsoft.Azure.Cosmos.Table;
 using NUnit.Framework;
 using NUnit.Framework.Interfaces;
 
+using StreamStone;
+
 namespace Streamstone.Scenarios
 {
     using Utility;
@@ -17,13 +19,15 @@ namespace Streamstone.Scenarios
     {
         const string EntityRowKey = "INV-0001";
         Partition partition;
-        CloudTable table;
+        ITable table;
         Stream stream;
+        CloudTable cloudTable;
 
         [SetUp]
         public void SetUp()
         {
             table = Storage.SetUp();
+            cloudTable = (table as AzureCloudTable)?.table;
             partition = new Partition(table, "test");
             stream = Stream.ProvisionAsync(partition).GetAwaiter().GetResult();
         }
@@ -38,7 +42,7 @@ namespace Streamstone.Scenarios
 
             EventData[] events =
             {
-                CreateEvent(insert), 
+                CreateEvent(insert),
                 CreateEvent(replace)
             };
 
@@ -62,11 +66,11 @@ namespace Streamstone.Scenarios
 
             EventData[] events =
             {
-                CreateEvent(insert), 
+                CreateEvent(insert),
                 CreateEvent(replace)
             };
 
-            Assert.DoesNotThrowAsync(() => 
+            Assert.DoesNotThrowAsync(() =>
                 Stream.WriteAsync(stream, events),
                     "Should choose (use) the one with higher priority. Insert in this case");
 
@@ -84,14 +88,14 @@ namespace Streamstone.Scenarios
 
             EventData[] events =
             {
-                CreateEvent(Include.Insert(e1)), 
+                CreateEvent(Include.Insert(e1)),
                 CreateEvent(Include.Replace(e2))
             };
 
-            Assert.ThrowsAsync<InvalidOperationException>(()=> 
+            Assert.ThrowsAsync<InvalidOperationException>(()=>
                 Stream.WriteAsync(stream, events),
-                    "Entity equality is by reference, since we need Etag from previous operation on the entity \n" + 
-                    "and since chunking may split events in separate batches its easier to have 'by-ref' equality.\n" + 
+                    "Entity equality is by reference, since we need Etag from previous operation on the entity \n" +
+                    "and since chunking may split events in separate batches its easier to have 'by-ref' equality.\n" +
                     "It also more memory efficient and less error-prone than 'by-value'");
         }
 
@@ -102,7 +106,7 @@ namespace Streamstone.Scenarios
 
             EventData[] events =
             {
-                CreateEvent(Include.Insert(entity)), 
+                CreateEvent(Include.Insert(entity)),
                 CreateEvent(Include.Delete(entity))
             };
 
@@ -119,8 +123,8 @@ namespace Streamstone.Scenarios
 
             EventData[] events =
             {
-                CreateEvent(Include.Insert(entity)), 
-                CreateEvent(Include.Replace(entity)), 
+                CreateEvent(Include.Insert(entity)),
+                CreateEvent(Include.Replace(entity)),
                 CreateEvent(Include.Delete(entity))
             };
 
@@ -156,7 +160,7 @@ namespace Streamstone.Scenarios
                 ETag = "*"
             };
 
-            Assert.DoesNotThrowAsync(() => 
+            Assert.DoesNotThrowAsync(() =>
                 Stream.WriteAsync(stream, CreateEvent(Include.Replace(entity))),
                     "Will be always executed and will fully replace contents");
 
@@ -210,8 +214,8 @@ namespace Streamstone.Scenarios
 
             EventData[] events =
             {
-                CreateEvent(Include.Insert(entity)), 
-                CreateEvent(Include.Replace(entity)), 
+                CreateEvent(Include.Insert(entity)),
+                CreateEvent(Include.Replace(entity)),
             };
 
             Assert.DoesNotThrowAsync(() =>
@@ -239,23 +243,23 @@ namespace Streamstone.Scenarios
         }
 
         /*
-        
+
         Rules for  operation chaining
         -----------------------------------------------------------------------------------
             --->    |    Insert    |    Replace    |    Delete   |  Upmerge   |  Upsert
-        -----------------------------------------------------------------------------------          
-        Insert      |      ERR     |    Insert     |     NULL    |    ERR     |    ERR    
         -----------------------------------------------------------------------------------
-        Replace     |      ERR     |    Replace    |    Delete   |    ERR     |    ERR 
+        Insert      |      ERR     |    Insert     |     NULL    |    ERR     |    ERR
+        -----------------------------------------------------------------------------------
+        Replace     |      ERR     |    Replace    |    Delete   |    ERR     |    ERR
         -----------------------------------------------------------------------------------
         Delete      |    Replace   |      ERR      |     ERR     |    ERR     |    ERR
         -----------------------------------------------------------------------------------
         NULL        |    Insert    |      ERR      |     ERR     |  Upmerge   |   Upsert
         -----------------------------------------------------------------------------------
         Upmerge     |      ERR     |      ERR      |     ERR     |  Upmerge   |    ERR
-        ----------------------------------------------------------------------------------- 
+        -----------------------------------------------------------------------------------
         Upsert      |      ERR     |      ERR      |     ERR     |    ERR     |   Upsert
-        ----------------------------------------------------------------------------------- 
+        -----------------------------------------------------------------------------------
 
         Upmerge - Insert-Or-Merge
         Upsert  - Insert-Or-Replace
@@ -276,13 +280,13 @@ namespace Streamstone.Scenarios
                 CreateEvent(Include.Insert(entity))
             };
 
-            var exception = Assert.ThrowsAsync<InvalidOperationException>(() => 
+            var exception = Assert.ThrowsAsync<InvalidOperationException>(() =>
                 Stream.WriteAsync(stream, events));
 
             Assert.That(exception,
                 Has.Message.Contains("cannot be followed by"));
         }
-                
+
         [Test]
         public async Task When_Insert_followed_by_Replace()
         {
@@ -299,7 +303,7 @@ namespace Streamstone.Scenarios
             var stored = RetrieveTestEntity(EntityRowKey);
             Assert.That(stored, Is.Not.Null);
         }
-                
+
         [Test]
         public async Task When_Insert_followed_by_Delete()
         {
@@ -314,7 +318,7 @@ namespace Streamstone.Scenarios
             await Stream.WriteAsync(stream, events);
 
             var stored = RetrieveTestEntity(EntityRowKey);
-            Assert.That(stored, Is.Null, 
+            Assert.That(stored, Is.Null,
                 "NULL since Insert interdifused with Delete");
         }
 
@@ -356,7 +360,7 @@ namespace Streamstone.Scenarios
             var stored = RetrieveTestEntity(EntityRowKey);
             Assert.That(stored.Data, Is.EqualTo("zzz"));
         }
-        
+
         [Test]
         public async Task When_Replace_followed_by_Delete()
         {
@@ -380,9 +384,9 @@ namespace Streamstone.Scenarios
         [Test]
         public async Task When_Delete_followed_by_Insert()
         {
-            //  transition of Delete -> Insert = Replace is safe, 
+            //  transition of Delete -> Insert = Replace is safe,
             //  since you can only get here by either starting from Replace or Delete
-            //  which means you either have Etag or * 
+            //  which means you either have Etag or *
             //  that's why there is an asumption that entity exists
 
             var entity = new TestEntity(EntityRowKey);
@@ -396,7 +400,7 @@ namespace Streamstone.Scenarios
             };
 
             await Stream.WriteAsync(stream, events);
-            
+
             var stored = RetrieveTestEntity(EntityRowKey);
             Assert.That(stored.Data, Is.EqualTo("zzz"));
         }
@@ -418,7 +422,7 @@ namespace Streamstone.Scenarios
             Assert.That(exception,
                 Has.Message.Contains("cannot be followed by"));
         }
-        
+
         [Test]
         public void When_Delete_followed_by_Delete()
         {
@@ -448,7 +452,7 @@ namespace Streamstone.Scenarios
             {
                 CreateEvent(Include.Insert(entity)), // that combination
                 CreateEvent(Include.Delete(entity)), //  produces NULL
-                
+
                 CreateEvent(Include.Insert(entity))
             };
 
@@ -456,8 +460,8 @@ namespace Streamstone.Scenarios
 
             var stored = RetrieveTestEntity(EntityRowKey);
             Assert.That(stored, Is.Not.Null);
-        }        
-        
+        }
+
         [Test]
         public void When_Null_followed_by_Replace()
         {
@@ -467,7 +471,7 @@ namespace Streamstone.Scenarios
             {
                 CreateEvent(Include.Insert(entity)), // that combination
                 CreateEvent(Include.Delete(entity)), //  produces NULL
-                
+
                 CreateEvent(Include.Replace(entity))
             };
 
@@ -476,8 +480,8 @@ namespace Streamstone.Scenarios
 
             Assert.That(exception,
                 Has.Message.Contains("cannot be applied to NULL"));
-        }        
-        
+        }
+
         [Test]
         public void When_Null_followed_by_Delete()
         {
@@ -487,7 +491,7 @@ namespace Streamstone.Scenarios
             {
                 CreateEvent(Include.Insert(entity)), // that combination
                 CreateEvent(Include.Delete(entity)), //  produces NULL
-                
+
                 CreateEvent(Include.Delete(entity))
             };
 
@@ -522,7 +526,7 @@ namespace Streamstone.Scenarios
             {
                 CreateEvent(Include.Insert(entity)), // that combination
                 CreateEvent(Include.Delete(entity)), //  produces NULL
-                
+
                 CreateEvent(Include.InsertOrMerge(entity))
             };
 
@@ -541,7 +545,7 @@ namespace Streamstone.Scenarios
             {
                 CreateEvent(Include.Insert(entity)), // that combination
                 CreateEvent(Include.Delete(entity)), //  produces NULL
-                
+
                 CreateEvent(Include.InsertOrReplace(entity))
             };
 
@@ -634,7 +638,7 @@ namespace Streamstone.Scenarios
                 TableOperators.And,
                 TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, rowKey));
 
-            return table.ExecuteQuery<TEntity>(filter).SingleOrDefault();
+            return cloudTable.ExecuteQuery<TEntity>(filter).SingleOrDefault();
         }
 
         static EventData CreateEvent(params Include[] includes)
@@ -654,7 +658,7 @@ namespace Streamstone.Scenarios
                 ETag = etag;
             }
 
-            public string Data { get; set; }            
+            public string Data { get; set; }
         }
 
         public class ExtendedTestEntity : TableEntity

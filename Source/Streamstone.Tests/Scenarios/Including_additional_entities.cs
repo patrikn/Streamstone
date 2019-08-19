@@ -7,6 +7,8 @@ using Microsoft.Azure.Cosmos.Table;
 
 using NUnit.Framework;
 
+using StreamStone;
+
 namespace Streamstone.Scenarios
 {
     using Utility;
@@ -15,12 +17,14 @@ namespace Streamstone.Scenarios
     public class Including_additional_entities
     {
         Partition partition;
-        CloudTable table;
+        ITable table;
+        CloudTable cloudTable;
 
         [SetUp]
         public void SetUp()
         {
             table = Storage.SetUp();
+            cloudTable = ((AzureCloudTable) table).table;
             partition = new Partition(table, "test");
         }
 
@@ -32,7 +36,7 @@ namespace Streamstone.Scenarios
 
             EventData[] events =
             {
-                CreateEvent("e1", Include.Insert(entity1)), 
+                CreateEvent("e1", Include.Insert(entity1)),
                 CreateEvent("e2", Include.Insert(entity2))
             };
 
@@ -48,9 +52,9 @@ namespace Streamstone.Scenarios
             Assert.That(result.Includes[0], Is.SameAs(entity1));
             Assert.That(result.Includes[0].ETag, Is.Not.Null.Or.Empty);
             Assert.That(result.Includes[1], Is.SameAs(entity2));
-            Assert.That(result.Includes[1].ETag, Is.Not.Null.Or.Empty);            
+            Assert.That(result.Includes[1].ETag, Is.Not.Null.Or.Empty);
         }
-        
+
         [Test]
         public async Task When_include_has_conflict()
         {
@@ -125,7 +129,7 @@ namespace Streamstone.Scenarios
             var eventIdEntities = partition.RetrieveEventIdEntities();
             Assert.That(eventIdEntities.Length, Is.EqualTo(events.Length));
 
-            Assert.That(partition.RetrieveAll().Count,
+            Assert.That(partition.RetrieveAll<object>().Count,
                 Is.EqualTo((eventEntities.Length * 2) + eventIdEntities.Length + 1));
         }
 
@@ -140,7 +144,7 @@ namespace Streamstone.Scenarios
                 .ToArray();
 
             var @event = new EventData(
-                EventId.From("offsize"), 
+                EventId.From("offsize"),
                 EventIncludes.From(includes)
             );
 
@@ -155,7 +159,7 @@ namespace Streamstone.Scenarios
                 TableOperators.And,
                 TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, rowKey));
 
-            return table.ExecuteQuery<TestEntity>(filter)
+            return cloudTable.ExecuteQuery<TestEntity>(filter)
                         .SingleOrDefault();
         }
 
@@ -169,8 +173,8 @@ namespace Streamstone.Scenarios
             };
 
             return new EventData(
-                            EventId.From(id), 
-                            EventProperties.From(properties), 
+                            EventId.From(id),
+                            EventProperties.From(properties),
                             EventIncludes.From(includes));
         }
 
@@ -185,7 +189,7 @@ namespace Streamstone.Scenarios
                 Data = DateTime.UtcNow.ToString();
             }
 
-            public string Data { get; set; }            
+            public string Data { get; set; }
         }
     }
 }

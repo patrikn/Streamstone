@@ -12,8 +12,8 @@ namespace Streamstone.Scenarios
     [TestFixture]
     public class Virtual_partitions
     {
-        CloudTable table;
-        
+        ITable table;
+
         Partition partition;
         Partition virtual1;
         Partition virtual2;
@@ -34,7 +34,7 @@ namespace Streamstone.Scenarios
             await Stream.ProvisionAsync(virtual1);
             await Stream.ProvisionAsync(virtual2);
 
-            Assert.That(partition.RetrieveAll().Count, Is.EqualTo(2));
+            Assert.That(partition.RetrieveAll<object>().Count, Is.EqualTo(2));
         }
 
         [Test]
@@ -58,7 +58,7 @@ namespace Streamstone.Scenarios
             await Stream.WriteAsync(stream1, e1, e2);
             await Stream.WriteAsync(stream2, e1, e2);
 
-            Assert.That(partition.RetrieveAll().Count, 
+            Assert.That(partition.RetrieveAll<object>().Count,
                 Is.EqualTo(2 + 2*(2*2)));
 
             var slice1 = await Stream.ReadAsync<TestRecordedEventEntity>(virtual1);

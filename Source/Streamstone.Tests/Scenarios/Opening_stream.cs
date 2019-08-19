@@ -12,7 +12,7 @@ namespace Streamstone.Scenarios
     public class Opening_stream
     {
         Partition partition;
-        CloudTable table;
+        ITable table;
 
         [SetUp]
         public void SetUp()
@@ -27,7 +27,7 @@ namespace Streamstone.Scenarios
             await Stream.ProvisionAsync(partition);
             Assert.NotNull(await Stream.OpenAsync(partition));
         }
-        
+
         [Test]
         public  void When_stream_does_not_exist()
         {
@@ -38,18 +38,18 @@ namespace Streamstone.Scenarios
         public async Task When_trying_to_open_and_stream_does_exists()
         {
             await Stream.ProvisionAsync(partition);
-            
+
             var result = await Stream.TryOpenAsync(partition);
-            
+
             Assert.That(result.Found, Is.True);
             Assert.That(result.Stream, Is.Not.Null);
         }
-        
+
         [Test]
         public async Task When_trying_to_open_and_stream_does_not_exist()
         {
             var result = await Stream.TryOpenAsync(partition);
-            
+
             Assert.That(result.Found, Is.False);
             Assert.That(result.Stream, Is.Null);
         }

@@ -20,22 +20,7 @@ namespace Streamstone
             /// <returns>An instance of <see cref="IEnumerable{T}"/> that allow to scroll over all rows</returns>
             public static IEnumerable<TEntity> RowKeyPrefixQuery<TEntity>(this Partition partition, string prefix) where TEntity : ITableEntity, new()
             {
-                var filter = 
-                      TableQuery.CombineFilters(
-                          TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partition.PartitionKey),
-                          TableOperators.And,
-                          WhereRowKeyPrefixFilter(prefix));
-
-                var query = new TableQuery<TEntity>().Where(filter);
-                TableContinuationToken token = null;
-                do
-                {
-                    var segment = partition.Table.ExecuteQuerySegmentedAsync(query, null).Result;
-                    token = segment.ContinuationToken;
-                    foreach (var res in segment.Results)
-                        yield return res;
-                }
-                while (token != null);               
+                return partition.Table.RowKeyPrefixQuery<TEntity>(partition.PartitionKey, prefix);
             }
 
             /// <summary>
@@ -57,18 +42,6 @@ namespace Streamstone
                         yield return res;
                 }
                 while (token != null);
-            }
-
-            static string WhereRowKeyPrefixFilter(string prefix)
-            {
-                var range = new PrefixRange(prefix);
-                var filter =
-                     TableQuery.CombineFilters(
-                         TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThanOrEqual, range.Start),
-                         TableOperators.And,
-                         TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThan, range.End));
-
-                return filter;
             }
         }
 

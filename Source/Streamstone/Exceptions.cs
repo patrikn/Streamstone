@@ -24,20 +24,23 @@ namespace Streamstone
     }
 
     /// <summary>
-    /// This exception is thrown when opening stream that doesn't exist 
+    /// This exception is thrown when opening stream that doesn't exist
     /// </summary>
     public sealed class StreamNotFoundException : StreamstoneException
     {
         /// <summary>
         /// The target partition
         /// </summary>
-        public readonly Partition Partition;
-
         internal StreamNotFoundException(Partition partition)
             : base("Stream header was not found in partition '{1}' which resides in '{0}' table located at {2}",
                    partition.Table, partition, partition.Table.StorageUri)
         {
-            Partition = partition;
+        }
+
+        internal StreamNotFoundException(string partitionKey, string table, string storageUri)
+            : base("Stream header was not found in partition '{1}' which resides in '{0}' table located at {2}",
+                partitionKey, table, storageUri)
+        {
         }
     }
 
@@ -94,7 +97,7 @@ namespace Streamstone
             var message = string.Format(
                 "Included '{3}' operation had conflicts in partition '{1}' which resides in '{0}' table located at {2}\n" +
                 "Dump of conflicting [{5}] contents follows: \n\t{4}",
-                partition.Table, partition, partition.Table.StorageUri, 
+                partition.Table, partition, partition.Table.StorageUri,
                 include.GetType().Name, dump, include.Entity.GetType());
 
             return new IncludedOperationConflictException(partition, include.Entity, message);
@@ -130,7 +133,7 @@ namespace Streamstone
 
         internal static Exception EventVersionExists(Partition partition, int version)
         {
-            return new ConcurrencyConflictException(partition, string.Format("Event with version '{0}' is already exists", version));            
+            return new ConcurrencyConflictException(partition, string.Format("Event with version '{0}' is already exists", version));
         }
 
         internal static Exception StreamChanged(Partition partition)

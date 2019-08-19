@@ -1,12 +1,18 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 using Microsoft.Azure.Cosmos.Table;
+
+using StreamStone;
+
+using Streamstone.Annotations;
 
 namespace Streamstone
 {
     /// <summary>
-    /// Represents table partition. Virtual partitions are created 
+    /// Represents table partition. Virtual partitions are created
     /// by using <c>`|`</c> split separator in a key.
     /// </summary>
     public sealed class Partition
@@ -16,7 +22,7 @@ namespace Streamstone
         /// <summary>
         /// The table in which this partition resides
         /// </summary>
-        public readonly CloudTable Table;
+        public readonly ITable Table;
 
         /// <summary>
         /// The partition key
@@ -39,21 +45,25 @@ namespace Streamstone
         /// <param name="table">The cloud table.</param>
         /// <param name="key">The full key.</param>
         /// <remarks>Use "partitionkey|rowkeyprefix" key syntax to create virtual partition</remarks>
-        public Partition(CloudTable table, string key)
+        public Partition(ITable table, string key)
         {
             Requires.NotNull(table, nameof(table));
             Requires.NotNullOrEmpty(key, nameof(key));
 
-            var parts = key.Split(separator, 2, 
+            var parts = key.Split(separator, 2,
                 StringSplitOptions.RemoveEmptyEntries);
 
             Table = table;
-            
+
             PartitionKey = parts[0];
-            RowKeyPrefix = parts.Length > 1 
-                            ? parts[1] + separator[0] 
+            RowKeyPrefix = parts.Length > 1
+                            ? parts[1] + separator[0]
                             : "";
             Key = key;
+        }
+
+        public Partition(CloudTable table, string key) : this(new AzureCloudTable(table), key)
+        {
         }
 
         /// <summary>
@@ -62,7 +72,7 @@ namespace Streamstone
         /// <param name="table">The cloud table.</param>
         /// <param name="partitionKey">The partition's own key.</param>
         /// <param name="rowKeyPrefix">The row's key prefix.</param>
-        public Partition(CloudTable table, string partitionKey, string rowKeyPrefix)
+        public Partition(ITable table, string partitionKey, string rowKeyPrefix)
         {
             Requires.NotNull(table, nameof(table));
             Requires.NotNullOrEmpty(partitionKey, nameof(partitionKey));
@@ -92,5 +102,16 @@ namespace Streamstone
         /// </returns>
         /// <filterpriority>2</filterpriority>
         public override string ToString() => string.Format("{0}.{1}", Table.Name, Key);
+
+        [CanBeNull]
+        public async Task<(THeader, IEnumerable<TEvent>)> ReadSlice<THeader, TEvent>(int startVersion, int sliceSize)
+            where THeader : ITableEntity, new()
+            where TEvent : new()
+        {
+            var rowKeyStart = EventVersionRowKey(startVersion);
+            var rowKeyEnd = EventVersionRowKey(startVersion + sliceSize - 1);
+
+            return await Table.ReadRows<THeader, TEvent>(PartitionKey, StreamRowKey(), rowKeyStart, rowKeyEnd);
+        }
     }
 }

@@ -34,5 +34,14 @@
             HasEvents = Events.Length > 0;
             IsEndOfStream = (startVersion + sliceSize - 1) >= stream.Version;
         }
+
+        internal StreamSlice(Stream stream, T[] events, bool hasEvents, bool isEndOfStream)
+        {
+            Stream = stream;
+            Events = events;
+
+            HasEvents = hasEvents;
+            IsEndOfStream = isEndOfStream;
+        }
     }
 }

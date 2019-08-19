@@ -6,6 +6,8 @@ using ExpectedObjects;
 
 using Microsoft.Azure.Cosmos.Table;
 
+using StreamStone;
+
 namespace Streamstone
 {
     using Utility;
@@ -13,13 +15,13 @@ namespace Streamstone
     {
         const string TableName = "Streams";
 
-        public static CloudTable SetUp()
+        public static ITable SetUp()
         {
             var account = TestStorageAccount();
 
-            return account == CloudStorageAccount.DevelopmentStorageAccount 
-                    ? SetUpDevelopmentStorageTable(account) 
-                    : SetUpAzureStorageTable(account);
+            return account == CloudStorageAccount.DevelopmentStorageAccount
+                    ? new AzureCloudTable(SetUpDevelopmentStorageTable(account))
+                    : new AzureCloudTable(SetUpAzureStorageTable(account));
         }
 
         static CloudTable SetUpDevelopmentStorageTable(CloudStorageAccount account)
@@ -62,10 +64,10 @@ namespace Streamstone
         static CloudStorageAccount TestStorageAccount()
         {
             var connectionString = Environment.GetEnvironmentVariable(
-                "Streamstone-Test-Storage", EnvironmentVariableTarget.User);
+                "Streamstone-Test-Storage", EnvironmentVariableTarget.Process);
 
-            return connectionString != null 
-                    ? CloudStorageAccount.Parse(connectionString) 
+            return connectionString != null
+                    ? CloudStorageAccount.Parse(connectionString)
                     : CloudStorageAccount.DevelopmentStorageAccount;
         }
 
@@ -93,16 +95,7 @@ namespace Streamstone
 
         public static StreamEntity RetrieveStreamEntity(this Partition partition)
         {
-            var filter =
-                TableQuery.CombineFilters(
-                    TableQuery.GenerateFilterCondition(nameof(StreamEntity.PartitionKey), QueryComparisons.Equal, partition.PartitionKey),
-                    TableOperators.And,
-                    TableQuery.GenerateFilterCondition(nameof(StreamEntity.RowKey), QueryComparisons.Equal, Api.StreamRowKey));
-
-            var query = new TableQuery<StreamEntity>().Where(filter);
-
-            var segment = partition.Table.ExecuteQuerySegmentedAsync(query, null).Result;
-            return segment.SingleOrDefault();
+            return partition.Table.ReadRowAsync<StreamEntity>(partition.PartitionKey, Api.StreamRowKey).Result;
         }
 
         public static void InsertEventEntities(this Partition partition, params string[] ids)
@@ -143,24 +136,10 @@ namespace Streamstone
             return partition.RowKeyPrefixQuery<EventIdEntity>(prefix: Api.EventIdRowKeyPrefix).ToArray();
         }
 
-        public static List<DynamicTableEntity> RetrieveAll(this Partition partition)
+        public static List<T> RetrieveAll<T>(this Partition partition)
+            where T : new()
         {
-            var filter = TableQuery.GenerateFilterCondition(nameof(StreamEntity.PartitionKey), QueryComparisons.Equal, partition.PartitionKey);
-            var query = new TableQuery<DynamicTableEntity>().Where(filter);
-
-            var entities = new List<DynamicTableEntity>();
-            TableContinuationToken token = null;
-
-            do
-            {
-                var segment = partition.Table.ExecuteQuerySegmentedAsync(query, token).Result;
-                token = segment.ContinuationToken;
-
-                entities.AddRange(segment.Results);
-            }
-            while (token != null);
-
-            return entities;
+            return partition.Table.ReadPartition<T>(partition.PartitionKey).Result;
         }
 
         static List<DynamicTableEntity> RetrieveAll(CloudTable table)
@@ -170,11 +149,11 @@ namespace Streamstone
 
             do
             {
-                var page = new TableQuery<DynamicTableEntity>().Take(512); 
+                var page = new TableQuery<DynamicTableEntity>().Take(512);
 
                 var segment = table.ExecuteQuerySegmentedAsync(page, token).Result;
                 token = segment.ContinuationToken;
-                
+
                 entities.AddRange(segment.Results);
             }
             while (token != null);
@@ -196,13 +175,13 @@ namespace Streamstone
             {
                 this.partition = partition;
 
-                captured = partition.RetrieveAll();
+                captured = partition.RetrieveAll<DynamicTableEntity>();
                 continueWith(this);
             }
 
             public void AssertNothingChanged()
             {
-                var current = partition.RetrieveAll();
+                var current = partition.RetrieveAll<DynamicTableEntity>();
                 captured.ToExpectedObject().ShouldMatch(current);
             }
         }
