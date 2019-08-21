@@ -56,7 +56,7 @@ namespace Streamstone
 
                 internal void Handle(StorageException exception)
                 {
-                    if (exception.RequestInformation.HttpStatusCode == (int)HttpStatusCode.Conflict)
+                    if (exception.RequestInformation.HttpStatusCode == (int) HttpStatusCode.Conflict)
                         throw ConcurrencyConflictException.StreamChangedOrExists(partition);
 
                     ExceptionDispatchInfo.Capture(exception).Throw();
@@ -68,7 +68,7 @@ namespace Streamstone
 
         class WriteOperation
         {
-            const int MaxOperationsPerChunk = 99;
+            readonly int MaxOperationsPerChunk;
 
             readonly Stream stream;
             readonly StreamWriteOptions options;
@@ -81,6 +81,7 @@ namespace Streamstone
                 this.options = options;
                 this.events = stream.Record(events);
                 table = stream.Partition.Table;
+                MaxOperationsPerChunk = table.MaxOperationsPerChunk;
             }
 
             public async Task<StreamWriteResult> ExecuteAsync()
@@ -106,13 +107,15 @@ namespace Streamstone
                 return new StreamWriteResult(current, events.ToArray());
             }
 
-            IEnumerable<Chunk> Chunks() => Chunk.Split(events).Where(s => !s.IsEmpty);
+            IEnumerable<Chunk> Chunks() => Chunk.Split(events, MaxOperationsPerChunk).Where(s => !s.IsEmpty);
 
             class Chunk
             {
-                public static IEnumerable<Chunk> Split(IEnumerable<RecordedEvent> events)
+                readonly int maxOperationsPerChunk;
+
+                public static IEnumerable<Chunk> Split(IEnumerable<RecordedEvent> events, int maxOperationsPerChunk)
                 {
-                    var current = new Chunk();
+                    var current = new Chunk(maxOperationsPerChunk);
 
                     foreach (var @event in events)
                     {
@@ -130,20 +133,22 @@ namespace Streamstone
                 readonly List<RecordedEvent> events = new List<RecordedEvent>();
                 int operations;
 
-                Chunk()
-                {}
+                Chunk(int maxOperationsPerChunk)
+                {
+                    this.maxOperationsPerChunk = maxOperationsPerChunk;
+                }
 
-                Chunk(RecordedEvent first) => Accomodate(first);
+                Chunk(RecordedEvent first, int maxOperationsPerChunk) : this(maxOperationsPerChunk) => Accomodate(first);
 
                 Chunk Add(RecordedEvent @event)
                 {
-                    if (@event.Operations > MaxOperationsPerChunk)
+                    if (@event.Operations > maxOperationsPerChunk)
                         throw new InvalidOperationException(
                             string.Format("{0} include(s) in event {1}:{{{2}}}, plus event entity itself, is over Azure's max batch size limit [{3}]",
-                                          @event.IncludedOperations.Length, @event.Version, @event.Id, MaxOperationsPerChunk));
+                                @event.IncludedOperations.Length, @event.Version, @event.Id, maxOperationsPerChunk));
 
                     if (!CanAccomodate(@event))
-                        return new Chunk(@event);
+                        return new Chunk(@event, maxOperationsPerChunk);
 
                     Accomodate(@event);
                     return this;
@@ -157,7 +162,7 @@ namespace Streamstone
 
                 bool CanAccomodate(RecordedEvent @event)
                 {
-                    return operations + @event.Operations <= MaxOperationsPerChunk;
+                    return operations + @event.Operations <= maxOperationsPerChunk;
                 }
 
                 public bool IsEmpty => events.Count == 0;
@@ -173,7 +178,7 @@ namespace Streamstone
             class Batch
             {
                 readonly List<EntityOperation> operations =
-                     new List<EntityOperation>();
+                    new List<EntityOperation>();
 
                 readonly StreamEntity stream;
                 readonly List<RecordedEvent> events;
@@ -234,10 +239,10 @@ namespace Streamstone
 
                 internal void Handle(StorageException exception)
                 {
-                    if (exception.RequestInformation.HttpStatusCode == (int)HttpStatusCode.PreconditionFailed)
+                    if (exception.RequestInformation.HttpStatusCode == (int) HttpStatusCode.PreconditionFailed)
                         throw ConcurrencyConflictException.StreamChangedOrExists(partition);
 
-                    if (exception.RequestInformation.HttpStatusCode != (int)HttpStatusCode.Conflict)
+                    if (exception.RequestInformation.HttpStatusCode != (int) HttpStatusCode.Conflict)
                         ExceptionDispatchInfo.Capture(exception).Throw();
 
                     var error = exception.RequestInformation.ExtendedErrorInformation;
@@ -331,7 +336,7 @@ namespace Streamstone
 
                 internal void Handle(StorageException exception)
                 {
-                    if (exception.RequestInformation.HttpStatusCode == (int)HttpStatusCode.PreconditionFailed)
+                    if (exception.RequestInformation.HttpStatusCode == (int) HttpStatusCode.PreconditionFailed)
                         throw ConcurrencyConflictException.StreamChanged(partition);
 
                     ExceptionDispatchInfo.Capture(exception).Throw();
@@ -352,18 +357,19 @@ namespace Streamstone
                 table = partition.Table;
             }
 
-            public async Task<StreamOpenResult> ExecuteAsync() =>
-                Result(await table.ExecuteAsync(Prepare()));
+            public async Task<StreamOpenResult> ExecuteAsync() => Result(await table.ReadRowAsync<StreamEntity>(partition.PartitionKey, partition.StreamRowKey()));
 
-            TableOperation Prepare() => TableOperation.Retrieve<StreamEntity>(partition.PartitionKey, partition.StreamRowKey());
-
-            StreamOpenResult Result(TableResult result)
+            TableOperation Prepare()
             {
-                var entity = result.Result;
+                var colossally = TableOperation.Retrieve<StreamEntity>(partition.PartitionKey, partition.StreamRowKey());
+                return colossally;
+            }
 
+            StreamOpenResult Result(StreamEntity entity)
+            {
                 return entity != null
-                           ? new StreamOpenResult(true, From(partition, (StreamEntity)entity))
-                           : StreamOpenResult.NotFound;
+                    ? new StreamOpenResult(true, From(partition, entity))
+                    : StreamOpenResult.NotFound;
             }
         }
 

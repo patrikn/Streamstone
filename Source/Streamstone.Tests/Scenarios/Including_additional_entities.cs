@@ -18,14 +18,12 @@ namespace Streamstone.Scenarios
     {
         Partition partition;
         ITable table;
-        CloudTable cloudTable;
 
         [SetUp]
         public void SetUp()
         {
             table = Storage.SetUp();
-            cloudTable = ((AzureCloudTable) table).table;
-            partition = new Partition(table, "test");
+            partition = new Partition(table, Guid.NewGuid().ToString());
         }
 
         [Test]
@@ -129,7 +127,7 @@ namespace Streamstone.Scenarios
             var eventIdEntities = partition.RetrieveEventIdEntities();
             Assert.That(eventIdEntities.Length, Is.EqualTo(events.Length));
 
-            Assert.That(partition.RetrieveAll<object>().Count,
+            Assert.That(partition.RetrieveAll<TableEntity>().Count,
                 Is.EqualTo((eventEntities.Length * 2) + eventIdEntities.Length + 1));
         }
 
@@ -154,13 +152,7 @@ namespace Streamstone.Scenarios
 
         TestEntity RetrieveTestEntity(string rowKey)
         {
-            var filter = TableQuery.CombineFilters(
-                TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partition.PartitionKey),
-                TableOperators.And,
-                TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, rowKey));
-
-            return cloudTable.ExecuteQuery<TestEntity>(filter)
-                        .SingleOrDefault();
+            return table.ReadRowAsync<TestEntity>(partition.PartitionKey, rowKey).Result;
         }
 
         static EventData CreateEvent(string id, params Include[] includes)

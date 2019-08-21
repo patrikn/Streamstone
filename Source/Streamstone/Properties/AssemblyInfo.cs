@@ -4,3 +4,4 @@ using System.Runtime.CompilerServices;
 
 [assembly: AssemblyTitle("Streamstone")]
 [assembly: InternalsVisibleTo("Streamstone.Tests")]
+[assembly: InternalsVisibleTo("Streamstone.DynamoDB")]

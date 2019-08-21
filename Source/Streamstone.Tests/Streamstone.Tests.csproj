@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\StreamStone.DynamoDB\StreamStone.DynamoDB.csproj" />
     <ProjectReference Include="..\Streamstone\Streamstone.csproj" />
   </ItemGroup>
 

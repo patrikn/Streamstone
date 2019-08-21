@@ -21,6 +21,7 @@ namespace StreamStone
 
         public string Name => table.Name;
         public string StorageUri => table.StorageUri.ToString();
+        public int MaxOperationsPerChunk => 99;
 
         public Task<TableResult> ExecuteAsync(TableOperation operation)
         {

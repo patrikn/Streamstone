@@ -23,9 +23,9 @@ namespace Streamstone.Scenarios
         {
             table = Storage.SetUp();
 
-            partition = new Partition(table, "test");
-            virtual1  = new Partition(table, "test|123");
-            virtual2  = new Partition(table, "test", "456");
+            partition = new Partition(table, Guid.NewGuid().ToString());
+            virtual1  = new Partition(table, $"{partition.PartitionKey}|123");
+            virtual2  = new Partition(table, partition.PartitionKey, "456");
         }
 
         [Test]

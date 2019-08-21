@@ -19,7 +19,7 @@ namespace Streamstone.Scenarios
         public void SetUp()
         {
             table = Storage.SetUp();
-            partition = new Partition(table, "test");
+            partition = new Partition(table, Guid.NewGuid().ToString());
         }
 
         [Test]

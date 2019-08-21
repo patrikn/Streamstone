@@ -28,7 +28,7 @@ namespace Streamstone.Scenarios
         {
             table = Storage.SetUp();
             cloudTable = (table as AzureCloudTable)?.table;
-            partition = new Partition(table, "test");
+            partition = new Partition(table, Guid.NewGuid().ToString());
             stream = Stream.ProvisionAsync(partition).GetAwaiter().GetResult();
         }
 
@@ -633,12 +633,7 @@ namespace Streamstone.Scenarios
         TEntity RetrieveEntity<TEntity>(string rowKey)
             where TEntity : TableEntity, new()
         {
-            var filter = TableQuery.CombineFilters(
-                TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partition.PartitionKey),
-                TableOperators.And,
-                TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, rowKey));
-
-            return cloudTable.ExecuteQuery<TEntity>(filter).SingleOrDefault();
+            return table.ReadRowAsync<TEntity>(partition.PartitionKey, rowKey).Result;
         }
 
         static EventData CreateEvent(params Include[] includes)

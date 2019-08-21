@@ -1,22 +1,88 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+
+using Amazon;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.Model;
+using Amazon.Runtime;
+using Amazon.Runtime.CredentialManagement;
 
 using ExpectedObjects;
 
 using Microsoft.Azure.Cosmos.Table;
 
 using StreamStone;
+using StreamStone.DynamoDB;
 
 namespace Streamstone
 {
     using Utility;
     static class Storage
     {
-        const string TableName = "Streams";
+        const string TableName = "Stream";
 
         public static ITable SetUp()
         {
+            var dynamoDb = Environment.GetEnvironmentVariable("Streamstone-DynamoDB");
+            if (dynamoDb != null)
+            {
+                var credentialChain = new CredentialProfileStoreChain();
+                if (credentialChain.TryGetAWSCredentials("streamstone", out var cred))
+                {
+                    var client = new AmazonDynamoDBClient(cred, RegionEndpoint.EUCentral1);
+                    try
+                    {
+                        client.DescribeTableAsync(TableName).Wait();
+                    }
+                    catch (Exception)
+                    {
+                        var keys = new List<KeySchemaElement>()
+                        {
+                            new KeySchemaElement("PartitionKey", KeyType.HASH),
+                            new KeySchemaElement("RowKey", KeyType.RANGE)
+                        };
+                        var attributes = new List<AttributeDefinition>()
+                        {
+                            new AttributeDefinition("PartitionKey", ScalarAttributeType.S),
+                            new AttributeDefinition("RowKey", ScalarAttributeType.S)
+                        };
+                        var req = new CreateTableRequest()
+                        {
+                            TableName = TableName,
+                            KeySchema = keys,
+                            BillingMode = BillingMode.PAY_PER_REQUEST,
+                            AttributeDefinitions = attributes
+                        };
+                        client.CreateTableAsync(req).Wait();
+                    }
+                    DescribeTableResponse tableStatus;
+                    do
+                    {
+                        tableStatus = client.DescribeTableAsync(TableName).Result;
+                    }
+                    while (tableStatus.Table.TableStatus == TableStatus.CREATING);
+
+                    AppDomain.CurrentDomain.ProcessExit += (s, e) =>
+                    {
+                        try
+                        {
+                            // client.DeleteTableAsync(TableName);
+                        }
+                        catch (Exception)
+                        {
+                            // ignored
+                        }
+                    };
+
+                    return new DynamoDBCloudTable(client, TableName);
+                }
+                else
+                {
+                    throw new Exception("Profile not found");
+                }
+            }
             var account = TestStorageAccount();
 
             return account == CloudStorageAccount.DevelopmentStorageAccount

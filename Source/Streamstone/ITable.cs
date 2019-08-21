@@ -11,6 +11,7 @@ namespace Streamstone
         string Name { get; }
 
         string StorageUri { get; }
+        int MaxOperationsPerChunk { get; }
 
         Task<TableResult> ExecuteAsync(TableOperation operation);
 

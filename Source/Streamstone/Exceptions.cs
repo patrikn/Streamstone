@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text;
 
 using Microsoft.Azure.Cosmos.Table;
@@ -60,11 +61,18 @@ namespace Streamstone
         public readonly string Id;
 
         internal DuplicateEventException(Partition partition, string id)
-            : base("Found existing event with id '{3}' in partition '{1}' which resides in '{0}' table located at {2}",
-                   partition.Table, partition, partition.Table.StorageUri, id)
+        : this(partition.Table.Name, partition.PartitionKey, partition.Table.StorageUri, id)
         {
             Partition = partition;
             Id = id;
+        }
+
+        internal DuplicateEventException(string table, string partition, string storageUri, string id)
+        : base("Found existing event with id '{3}' in partition '{1}' which resides in '{0}' table located at {2}",
+            table, partition, storageUri, id)
+        {
+            Id = id;
+            Partition = null;
         }
     }
 
@@ -92,15 +100,30 @@ namespace Streamstone
 
         internal static IncludedOperationConflictException Create(Partition partition, EntityOperation include)
         {
-            var dump = Dump(include.Entity);
+            var table = partition.Table;
+            var storageUri = table.StorageUri;
+            var includeEntity = include.Entity;
+            var dump = Dump(includeEntity);
+            var typeName = include.GetType().Name;
 
+            return Create(partition, table.Name, typeName, storageUri, dump, includeEntity);
+        }
+
+        internal static IncludedOperationConflictException Create(
+            Partition partition,
+            string tableName,
+            string typeName,
+            string storageUri,
+            string dump,
+            ITableEntity includeEntity)
+        {
             var message = string.Format(
                 "Included '{3}' operation had conflicts in partition '{1}' which resides in '{0}' table located at {2}\n" +
-                "Dump of conflicting [{5}] contents follows: \n\t{4}",
-                partition.Table, partition, partition.Table.StorageUri,
-                include.GetType().Name, dump, include.Entity.GetType());
+                    "Dump of conflicting [{5}] contents follows: \n\t{4}",
+                tableName, partition, storageUri,
+                typeName, dump, includeEntity.GetType());
 
-            return new IncludedOperationConflictException(partition, include.Entity, message);
+            return new IncludedOperationConflictException(partition, includeEntity, message);
         }
 
         static string Dump(ITableEntity entity)
@@ -129,6 +152,13 @@ namespace Streamstone
                    partition.Table, partition, partition.Table.StorageUri, details)
         {
             Partition = partition;
+        }
+
+        internal ConcurrencyConflictException(string table, string partition, string storageUri, string details)
+            : base("Concurrent write detected for partition '{1}' which resides in table '{0}' located at {2}. See details below.\n{3}",
+                table, partition, storageUri, details)
+        {
+            Partition = null;
         }
 
         internal static Exception EventVersionExists(Partition partition, int version)
@@ -161,6 +191,11 @@ namespace Streamstone
             : base("Unexpected Table Storage response. Details: " + details)
         {
             Error = error;
+        }
+
+        internal UnexpectedStorageResponseException(string message, Exception innerException)
+            : base(message, innerException)
+        {
         }
 
         internal static Exception ErrorCodeShouldBeEntityAlreadyExists(StorageExtendedErrorInformation error)
