@@ -1,11 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-
-using Microsoft.Azure.Cosmos.Table;
-
-using StreamStone;
 
 using Streamstone.Annotations;
 
@@ -62,10 +57,6 @@ namespace Streamstone
             Key = key;
         }
 
-        public Partition(CloudTable table, string key) : this(new AzureCloudTable(table), key)
-        {
-        }
-
         /// <summary>
         /// Creates virtual partition using provided partition key and row key prefix.
         /// </summary>
@@ -106,7 +97,7 @@ namespace Streamstone
         [CanBeNull]
         public async Task<(THeader, IEnumerable<TEvent>)> ReadSlice<THeader, TEvent>(int startVersion, int sliceSize)
             where THeader : ITableEntity, new()
-            where TEvent : new()
+            where TEvent : ITableEntity, new()
         {
             var rowKeyStart = EventVersionRowKey(startVersion);
             var rowKeyEnd = EventVersionRowKey(startVersion + sliceSize - 1);

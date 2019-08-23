@@ -1,11 +1,8 @@
 ﻿using System;
-using System.Linq;
-
-using Microsoft.Azure.Cosmos.Table;
 
 namespace Streamstone
 {
-    abstract class EntityOperation
+    public abstract class EntityOperation
     {
         public static readonly EntityOperation None = new Null();
 
@@ -205,10 +202,10 @@ namespace Streamstone
                 : base(entity)
             {}
 
-            protected override TableOperation AsTableOperation() => 
+            protected override TableOperation AsTableOperation() =>
                 TableOperation.Merge(Entity);
 
-            public override EntityOperation Merge(EntityOperation other) => 
+            public override EntityOperation Merge(EntityOperation other) =>
                 throw new InvalidOperationException("Internal-only stream header merge operation");
         }
 

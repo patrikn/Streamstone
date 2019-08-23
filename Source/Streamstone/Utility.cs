@@ -1,7 +1,5 @@
 ﻿using System.Collections.Generic;
 
-using Microsoft.Azure.Cosmos.Table;
-
 namespace Streamstone
 {
     namespace Utility
@@ -21,60 +19,6 @@ namespace Streamstone
             public static IEnumerable<TEntity> RowKeyPrefixQuery<TEntity>(this Partition partition, string prefix) where TEntity : ITableEntity, new()
             {
                 return partition.Table.RowKeyPrefixQuery<TEntity>(partition.PartitionKey, prefix);
-            }
-
-            /// <summary>
-            /// Applies row key prefix criteria to given table which allows to query a range of rows
-            /// </summary>
-            /// <typeparam name="TEntity">The type of the entity to return.</typeparam>
-            /// <param name="table">The table.</param>
-            /// <param name="filter">The row key prefix filter.</param>
-            /// <returns>An instance of <see cref="IEnumerable{T}"/> that alllow further criterias to be added</returns>
-            public static IEnumerable<TEntity> ExecuteQuery<TEntity>(this CloudTable table, string filter) where TEntity : ITableEntity, new()
-            {
-                var query = new TableQuery<TEntity>().Where(filter);
-                TableContinuationToken token;
-                do
-                {
-                    var segment = table.ExecuteQuerySegmentedAsync(query, null).Result;
-                    token = segment.ContinuationToken;
-                    foreach (var res in segment.Results)
-                        yield return res;
-                }
-                while (token != null);
-            }
-        }
-
-        /// <summary>
-        /// Represents lexicographical range
-        /// </summary>
-        public struct PrefixRange
-        {
-            /// <summary>
-            /// The start of the range
-            /// </summary>
-            public readonly string Start;
-
-            /// <summary>
-            /// The end of the range
-            /// </summary>
-            public readonly string End;
-
-            /// <summary>
-            /// Initializes a new instance of the <see cref="PrefixRange"/> struct.
-            /// </summary>
-            /// <param name="prefix">The prefix upon which to build a range.</param>
-            public PrefixRange(string prefix)
-            {
-                Requires.NotNullOrEmpty(prefix, nameof(prefix));
-
-                Start = prefix;
-
-                var length = prefix.Length - 1;
-                var lastChar = prefix[length];
-                var nextLastChar = (char)(lastChar + 1);
-
-                End = prefix.Substring(0, length) + nextLastChar;
             }
         }
     }

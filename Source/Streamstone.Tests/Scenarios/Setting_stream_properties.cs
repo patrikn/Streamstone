@@ -6,8 +6,6 @@ using System.Threading.Tasks;
 using ExpectedObjects;
 using NUnit.Framework;
 
-using Microsoft.Azure.Cosmos.Table;
-
 using StreamStone;
 
 namespace Streamstone.Scenarios
@@ -78,7 +76,7 @@ namespace Streamstone.Scenarios
         {
             var stream = new Stream(partition);
 
-            partition.CaptureContents(contents =>
+            partition.CaptureContents<EventEntity>(contents =>
             {
                 Assert.ThrowsAsync<ArgumentException>(
                     async ()=> await Stream.SetPropertiesAsync(stream, StreamProperties.None));

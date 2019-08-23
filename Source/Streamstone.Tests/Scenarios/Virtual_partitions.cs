@@ -3,8 +3,6 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-using Microsoft.Azure.Cosmos.Table;
-
 using NUnit.Framework;
 
 namespace Streamstone.Scenarios
@@ -34,7 +32,7 @@ namespace Streamstone.Scenarios
             await Stream.ProvisionAsync(virtual1);
             await Stream.ProvisionAsync(virtual2);
 
-            Assert.That(partition.RetrieveAll<object>().Count, Is.EqualTo(2));
+            Assert.That(partition.RetrieveAll<StreamEntity>().Count, Is.EqualTo(2));
         }
 
         [Test]
@@ -58,7 +56,7 @@ namespace Streamstone.Scenarios
             await Stream.WriteAsync(stream1, e1, e2);
             await Stream.WriteAsync(stream2, e1, e2);
 
-            Assert.That(partition.RetrieveAll<object>().Count,
+            Assert.That(partition.RetrieveAll<EventEntity>().Count,
                 Is.EqualTo(2 + 2*(2*2)));
 
             var slice1 = await Stream.ReadAsync<TestRecordedEventEntity>(virtual1);
@@ -72,6 +70,7 @@ namespace Streamstone.Scenarios
         {
             var properties = new Dictionary<string, EntityProperty>
             {
+                {"Id", new EntityProperty("MyFakeId")},
                 {"Type", new EntityProperty("StreamChanged")},
                 {"Data", new EntityProperty("{}")}
             };

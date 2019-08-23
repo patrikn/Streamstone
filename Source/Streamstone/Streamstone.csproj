@@ -14,8 +14,8 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageId>Streamstone</PackageId>
-    <Title>Streamstone core library</Title>
+    <PackageId>Dynamostone</PackageId>
+    <Title>Streamstone for DynamoDB core library</Title>
     <Description>Streamstone is a lightweight library which implements a low-level mechanics of Event Store on top of Windows Azure Table Storage. Handles concurrency conflicts via optimistic locking. Supports custom event and stream metadata. Optimized for batch processing.</Description>
   </PropertyGroup>
 
@@ -25,7 +25,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Azure.Cosmos.Table" Version="$(MicrosoftAzureCosmosTableVersion)" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.5.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
   </ItemGroup>
 
 </Project>

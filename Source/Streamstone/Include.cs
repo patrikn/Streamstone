@@ -1,7 +1,5 @@
 ﻿using System;
 
-using Microsoft.Azure.Cosmos.Table;
-
 namespace Streamstone
 {
     /// <summary>
@@ -13,7 +11,7 @@ namespace Streamstone
         /// The insert operation
         /// </summary>
         Insert,
-        
+
         /// <summary>
         /// The replace operation
         /// </summary>

@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-using Microsoft.Azure.Cosmos.Table;
-
 using NUnit.Framework;
 
 using StreamStone;
@@ -127,7 +125,7 @@ namespace Streamstone.Scenarios
             var eventIdEntities = partition.RetrieveEventIdEntities();
             Assert.That(eventIdEntities.Length, Is.EqualTo(events.Length));
 
-            Assert.That(partition.RetrieveAll<TableEntity>().Count,
+            Assert.That(partition.RetrieveAll<TestEntity>().Count,
                 Is.EqualTo((eventEntities.Length * 2) + eventIdEntities.Length + 1));
         }
 
@@ -182,6 +180,14 @@ namespace Streamstone.Scenarios
             }
 
             public string Data { get; set; }
+            protected override IDictionary<string, EntityProperty> WriteCustom(IDictionary<string, EntityProperty> withProperties)
+            {
+                return withProperties;
+            }
+
+            protected override void ReadCustom(Dictionary<string, EntityProperty> properties)
+            {
+            }
         }
     }
 }

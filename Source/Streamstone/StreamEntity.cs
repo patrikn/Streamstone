@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-
-using Microsoft.Azure.Cosmos.Table;
 
 namespace Streamstone
 {
-    class StreamEntity : TableEntity
+    sealed class StreamEntity : TableEntity
     {
         public const string FixedRowKey = "SS-HEAD";
 
@@ -25,52 +22,41 @@ namespace Streamstone
             Properties = properties;
         }
 
-        public int Version                  { get; set; }
-        public StreamProperties Properties  { get; set; }
+        public int Version { get; set; }
 
-        public override void ReadEntity(IDictionary<string, EntityProperty> properties, OperationContext operationContext)
+        public override PropertyMap Properties
         {
-            base.ReadEntity(properties, operationContext);
-            Properties = StreamProperties.ReadEntity(properties);
+            get => StreamProperties;
+            set => StreamProperties = StreamProperties.From(value);
         }
 
-        public override IDictionary<string, EntityProperty> WriteEntity(OperationContext operationContext)
+        public StreamProperties StreamProperties { get; private set; }
+
+        protected override IDictionary<string, EntityProperty> WriteCustom(IDictionary<string, EntityProperty> withProperties)
         {
-            var result = base.WriteEntity(operationContext);
-            Properties.WriteTo(result);
-            return result;
+            withProperties["Version"] = Version;
+            return withProperties;
         }
 
-        public static StreamEntity From(DynamicTableEntity entity)
+        protected override void ReadCustom(Dictionary<string, EntityProperty> properties)
         {
-            return new StreamEntity
-            {
-                PartitionKey = entity.PartitionKey,
-                RowKey = entity.RowKey,
-                ETag = entity.ETag,
-                Timestamp = entity.Timestamp,
-                Version = (int)entity.Properties["Version"].PropertyAsObject,
-                Properties = StreamProperties.From(entity)
-            };
+            Version = (int) properties["Version"].NumberValue();
         }
 
         public EntityOperation Operation()
         {
             var isTransient = ETag == null;
-            
+
             return isTransient ? Insert() : ReplaceOrMerge();
 
             EntityOperation.Insert Insert() => new EntityOperation.Insert(this);
 
             EntityOperation ReplaceOrMerge() => ReferenceEquals(Properties, StreamProperties.None)
                 ? new EntityOperation.UpdateMerge(this)
-                : (EntityOperation)new EntityOperation.Replace(this);
+                : (EntityOperation) new EntityOperation.Replace(this);
         }
 
         [IgnoreProperty]
-        public Partition Partition
-        {
-            get; set;
-        }
+        public Partition Partition { get; set; }
     }
 }

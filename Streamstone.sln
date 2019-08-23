@@ -5,8 +5,6 @@ VisualStudioVersion = 15.0.26730.3
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Streamstone", "Source\Streamstone\Streamstone.csproj", "{7E2DA0DE-23B0-40BC-BF2D-E4675097643C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Example", "Source\Example\Example.csproj", "{1E165F45-64A0-4188-8B10-B1FFCE6D0A5B}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Streamstone.Tests", "Source\Streamstone.Tests\Streamstone.Tests.csproj", "{135A2BDB-3F3E-403B-A539-FC49CDE9DE5B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StreamStone.DynamoDB", "StreamStone.DynamoDB\StreamStone.DynamoDB.csproj", "{C35D7A44-199B-4F74-88E0-1DA96A0A3F96}"
@@ -21,10 +19,6 @@ Global
 		{7E2DA0DE-23B0-40BC-BF2D-E4675097643C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7E2DA0DE-23B0-40BC-BF2D-E4675097643C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7E2DA0DE-23B0-40BC-BF2D-E4675097643C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1E165F45-64A0-4188-8B10-B1FFCE6D0A5B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1E165F45-64A0-4188-8B10-B1FFCE6D0A5B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1E165F45-64A0-4188-8B10-B1FFCE6D0A5B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1E165F45-64A0-4188-8B10-B1FFCE6D0A5B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{135A2BDB-3F3E-403B-A539-FC49CDE9DE5B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{135A2BDB-3F3E-403B-A539-FC49CDE9DE5B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{135A2BDB-3F3E-403B-A539-FC49CDE9DE5B}.Release|Any CPU.ActiveCfg = Release|Any CPU

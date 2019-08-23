@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
-using Microsoft.Azure.Cosmos.Table;
+using Newtonsoft.Json;
 
 namespace Streamstone
 {
@@ -128,12 +126,7 @@ namespace Streamstone
 
         static string Dump(ITableEntity entity)
         {
-            var result = new StringBuilder();
-
-            foreach (var property in entity.WriteEntity(new OperationContext()))
-                result.Append($"\"{property.Key}\" : {property.Value}");
-
-            return result.ToString();
+            return JsonConvert.SerializeObject(entity);
         }
     }
 
@@ -182,40 +175,9 @@ namespace Streamstone
     /// </summary>
     public sealed class UnexpectedStorageResponseException : StreamstoneException
     {
-        /// <summary>
-        /// The error information
-        /// </summary>
-        public readonly StorageExtendedErrorInformation Error;
-
-        UnexpectedStorageResponseException(StorageExtendedErrorInformation error, string details)
-            : base("Unexpected Table Storage response. Details: " + details)
-        {
-            Error = error;
-        }
-
         internal UnexpectedStorageResponseException(string message, Exception innerException)
             : base(message, innerException)
         {
-        }
-
-        internal static Exception ErrorCodeShouldBeEntityAlreadyExists(StorageExtendedErrorInformation error)
-        {
-            return new UnexpectedStorageResponseException(error, "Erorr code should be indicated as 'EntityAlreadyExists' but was: " + error.ErrorCode);
-        }
-
-        internal static Exception ConflictExceptionMessageShouldHaveExactlyThreeLines(StorageExtendedErrorInformation error)
-        {
-            return new UnexpectedStorageResponseException(error, "Conflict exception message should have exactly 3 lines");
-        }
-
-        internal static Exception ConflictExceptionMessageShouldHaveSemicolonOnFirstLine(StorageExtendedErrorInformation error)
-        {
-            return new UnexpectedStorageResponseException(error, "Conflict exception message should have semicolon on first line");
-        }
-
-        internal static Exception UnableToParseTextBeforeSemicolonToInteger(StorageExtendedErrorInformation error)
-        {
-            return new UnexpectedStorageResponseException(error, "Unable to parse text on first line before semicolon as integer");
         }
     }
 }

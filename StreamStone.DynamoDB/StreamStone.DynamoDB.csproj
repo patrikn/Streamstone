@@ -12,4 +12,15 @@
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.3.101.56" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <SourceLinkCreate>true</SourceLinkCreate>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Dynamostone.DynamoDB</PackageId>
+    <Title>DynamoDB driver for Dynamostone</Title>
+    <Description>Streamstone is a lightweight library which implements a low-level mechanics of Event Store on top of Windows Azure Table Storage. Handles concurrency conflicts via optimistic locking. Supports custom event and stream metadata. Optimized for batch processing.</Description>
+  </PropertyGroup>
+
 </Project>

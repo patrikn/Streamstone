@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-using Microsoft.Azure.Cosmos.Table;
 
 namespace Streamstone
 {
@@ -13,7 +12,7 @@ namespace Streamstone
         string StorageUri { get; }
         int MaxOperationsPerChunk { get; }
 
-        Task<TableResult> ExecuteAsync(TableOperation operation);
+        Task ExecuteAsync(TableOperation operation);
 
         Task ExecuteBatchAsync(TableBatchOperation operation);
 
@@ -21,11 +20,11 @@ namespace Streamstone
 
         Task<(THeader, IEnumerable<TEvent>)> ReadRows<THeader, TEvent>(string partitionKey, string headerRowKey, string rowKeyStart, string rowKeyEnd)
             where THeader : ITableEntity, new()
-            where TEvent : new();
+            where TEvent : ITableEntity, new();
 
         Task<T> ReadRowAsync<T>(string partitionKey, string rowKey)
             where T : ITableEntity, new();
 
-        Task<List<T>> ReadPartition<T>(string partitionKey) where T : new();
+        Task<List<T>> ReadPartition<T>(string partitionKey) where T : ITableEntity, new();
     }
 }

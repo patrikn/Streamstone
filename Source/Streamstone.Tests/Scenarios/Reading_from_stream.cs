@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-using Microsoft.Azure.Cosmos.Table;
-
 using NUnit.Framework;
 
 namespace Streamstone.Scenarios
@@ -139,7 +137,7 @@ namespace Streamstone.Scenarios
             EventData[] events = { CreateEvent("e1"), CreateEvent("e2") };
             await Stream.WriteAsync(new Stream(partition), events);
 
-            var slice = await Stream.ReadAsync<DynamicTableEntity>(partition, sliceSize: 2);
+            var slice = await Stream.ReadAsync<StreamEntity>(partition, sliceSize: 2);
 
             Assert.That(slice.IsEndOfStream, Is.True);
             Assert.That(slice.Events.Length, Is.EqualTo(2));
@@ -176,7 +174,6 @@ namespace Streamstone.Scenarios
             Assert.That(e.PartitionKey, Is.EqualTo(partition.Key));
             Assert.That(e.RowKey, Is.EqualTo(partition.EventVersionRowKey(1)));
             Assert.That(e.ETag, Is.Not.Null.Or.Empty);
-            Assert.That(e.Timestamp, Is.Not.EqualTo(DateTimeOffset.MinValue));
         }
 
         class CustomTableEntity : TableEntity
@@ -184,6 +181,20 @@ namespace Streamstone.Scenarios
             public string Id   { get; set; }
             public string Type { get; set; }
             public string Data { get; set; }
+            protected override IDictionary<string, EntityProperty> WriteCustom(IDictionary<string, EntityProperty> withProperties)
+            {
+                withProperties["Id"] = Id;
+                withProperties["Type"] = Type;
+                withProperties["Data"] = Data;
+                return withProperties;
+            }
+
+            protected override void ReadCustom(Dictionary<string, EntityProperty> properties)
+            {
+                Id = properties["Id"].StringValue();
+                Type = properties["Type"].StringValue();
+                Data = properties["Data"].StringValue();
+            }
         }
 
         static EventData CreateEvent(string id)

@@ -56,12 +56,12 @@ namespace Streamstone
         /// The partition in which this stream resides.
         /// </summary>
         public readonly Partition Partition;
-        
+
         /// <summary>
         /// The latest etag
         /// </summary>
         public readonly string ETag;
-        
+
         /// <summary>
         /// The version of the stream. Sequential, monotonically increasing, no gaps.
         /// </summary>
@@ -71,12 +71,12 @@ namespace Streamstone
         /// Constructs a new <see cref="Stream"/> instance which doesn't have any additional properties.
         /// </summary>
         /// <param name="partition">
-        /// The partition in which this stream will reside. 
+        /// The partition in which this stream will reside.
         /// </param>
         /// <exception cref="ArgumentNullException">
         ///     If <paramref name="partition"/> is <c>null</c>
         /// </exception>
-        public Stream(Partition partition) 
+        public Stream(Partition partition)
             : this(partition, StreamProperties.None)
         {}
 
@@ -84,7 +84,7 @@ namespace Streamstone
         /// Constructs a new <see cref="Stream"/> instance with the given additional properties.
         /// </summary>
         /// <param name="partition">
-        /// The partition in which this stream will reside. 
+        /// The partition in which this stream will reside.
         /// </param>
         /// <param name="properties">
         /// The additional properties for this stream.
@@ -128,13 +128,13 @@ namespace Streamstone
         /// </value>
         public bool IsPersistent => !IsTransient;
 
-        static Stream From(Partition partition, StreamEntity entity) => 
-            new Stream(partition, entity.ETag, entity.Version, entity.Properties);
+        static Stream From(Partition partition, StreamEntity entity) =>
+            new Stream(partition, entity.ETag, entity.Version, entity.StreamProperties);
 
-        StreamEntity Entity() => 
+        StreamEntity Entity() =>
             new StreamEntity(Partition, ETag, Version, Properties);
 
-        IEnumerable<RecordedEvent> Record(IEnumerable<EventData> events) => 
+        IEnumerable<RecordedEvent> Record(IEnumerable<EventData> events) =>
             events.Select((e, i) => e.Record(Partition, Version + i + 1));
     }
 }

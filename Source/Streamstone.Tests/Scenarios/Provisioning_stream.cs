@@ -6,8 +6,6 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using ExpectedObjects;
 
-using Microsoft.Azure.Cosmos.Table;
-
 namespace Streamstone.Scenarios
 {
     [TestFixture]
@@ -55,8 +53,8 @@ namespace Streamstone.Scenarios
         {
             var properties = new Dictionary<string, EntityProperty>
             {
-                {"Created", new EntityProperty(DateTimeOffset.Now)},
-                {"Active",  new EntityProperty(true)}
+                {"Created", new EntityProperty(DateTimeOffset.Now.ToUnixTimeSeconds())},
+                {"Active",  new EntityProperty("true")}
             };
 
             var stream = await Stream.ProvisionAsync(partition, StreamProperties.From(properties));

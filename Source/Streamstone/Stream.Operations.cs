@@ -2,11 +2,8 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Net;
-using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 
-using Microsoft.Azure.Cosmos.Table;
 
 namespace Streamstone
 {
@@ -29,14 +26,7 @@ namespace Streamstone
             {
                 var insert = new Insert(stream);
 
-                try
-                {
-                    await table.ExecuteAsync(insert.Prepare()).ConfigureAwait(false);
-                }
-                catch (StorageException e)
-                {
-                    insert.Handle(e);
-                }
+                await table.ExecuteAsync(insert.Prepare()).ConfigureAwait(false);
 
                 return insert.Result();
             }
@@ -53,14 +43,6 @@ namespace Streamstone
                 }
 
                 public TableOperation Prepare() => TableOperation.Insert(stream);
-
-                internal void Handle(StorageException exception)
-                {
-                    if (exception.RequestInformation.HttpStatusCode == (int) HttpStatusCode.Conflict)
-                        throw ConcurrencyConflictException.StreamChangedOrExists(partition);
-
-                    ExceptionDispatchInfo.Capture(exception).Throw();
-                }
 
                 internal Stream Result() => From(partition, stream);
             }
@@ -92,14 +74,7 @@ namespace Streamstone
                 {
                     var batch = chunk.ToBatch(current, options);
 
-                    try
-                    {
-                        await table.ExecuteBatchAsync(batch.Prepare()).ConfigureAwait(false);
-                    }
-                    catch (StorageException e)
-                    {
-                        batch.Handle(e);
-                    }
+                    await table.ExecuteBatchAsync(batch.Prepare()).ConfigureAwait(false);
 
                     current = batch.Result();
                 }
@@ -236,55 +211,6 @@ namespace Streamstone
                 {
                     return From(partition, stream);
                 }
-
-                internal void Handle(StorageException exception)
-                {
-                    if (exception.RequestInformation.HttpStatusCode == (int) HttpStatusCode.PreconditionFailed)
-                        throw ConcurrencyConflictException.StreamChangedOrExists(partition);
-
-                    if (exception.RequestInformation.HttpStatusCode != (int) HttpStatusCode.Conflict)
-                        ExceptionDispatchInfo.Capture(exception).Throw();
-
-                    var error = exception.RequestInformation.ExtendedErrorInformation;
-                    if (error.ErrorCode != "EntityAlreadyExists")
-                        throw UnexpectedStorageResponseException.ErrorCodeShouldBeEntityAlreadyExists(error);
-
-                    var position = ParseConflictingEntityPosition(error);
-
-                    Debug.Assert(position >= 0 && position < operations.Count);
-                    var conflicting = operations[position].Entity;
-
-                    if (conflicting == stream)
-                        throw ConcurrencyConflictException.StreamChangedOrExists(partition);
-
-                    var id = conflicting as EventIdEntity;
-                    if (id != null)
-                        throw new DuplicateEventException(partition, id.Event.Id);
-
-                    var @event = conflicting as EventEntity;
-                    if (@event != null)
-                        throw ConcurrencyConflictException.EventVersionExists(partition, @event.Version);
-
-                    var include = operations.Single(x => x.Entity == conflicting);
-                    throw IncludedOperationConflictException.Create(partition, include);
-                }
-
-                static int ParseConflictingEntityPosition(StorageExtendedErrorInformation error)
-                {
-                    var lines = error.ErrorMessage.Split('\n');
-                    if (lines.Length != 3)
-                        throw UnexpectedStorageResponseException.ConflictExceptionMessageShouldHaveExactlyThreeLines(error);
-
-                    var semicolonIndex = lines[0].IndexOf(":", StringComparison.Ordinal);
-                    if (semicolonIndex == -1)
-                        throw UnexpectedStorageResponseException.ConflictExceptionMessageShouldHaveSemicolonOnFirstLine(error);
-
-                    int position;
-                    if (!int.TryParse(lines[0].Substring(0, semicolonIndex), out position))
-                        throw UnexpectedStorageResponseException.UnableToParseTextBeforeSemicolonToInteger(error);
-
-                    return position;
-                }
             }
         }
 
@@ -305,14 +231,7 @@ namespace Streamstone
             {
                 var replace = new Replace(stream, properties);
 
-                try
-                {
-                    await table.ExecuteAsync(replace.Prepare()).ConfigureAwait(false);
-                }
-                catch (StorageException e)
-                {
-                    replace.Handle(e);
-                }
+                await table.ExecuteAsync(replace.Prepare()).ConfigureAwait(false);
 
                 return replace.Result();
             }
@@ -334,14 +253,6 @@ namespace Streamstone
                     return TableOperation.Replace(stream);
                 }
 
-                internal void Handle(StorageException exception)
-                {
-                    if (exception.RequestInformation.HttpStatusCode == (int) HttpStatusCode.PreconditionFailed)
-                        throw ConcurrencyConflictException.StreamChanged(partition);
-
-                    ExceptionDispatchInfo.Capture(exception).Throw();
-                }
-
                 internal Stream Result() => From(partition, stream);
             }
         }
@@ -359,12 +270,6 @@ namespace Streamstone
 
             public async Task<StreamOpenResult> ExecuteAsync() => Result(await table.ReadRowAsync<StreamEntity>(partition.PartitionKey, partition.StreamRowKey()));
 
-            TableOperation Prepare()
-            {
-                var colossally = TableOperation.Retrieve<StreamEntity>(partition.PartitionKey, partition.StreamRowKey());
-                return colossally;
-            }
-
             StreamOpenResult Result(StreamEntity entity)
             {
                 return entity != null
@@ -373,7 +278,7 @@ namespace Streamstone
             }
         }
 
-        class ReadOperation<T> where T : class, new()
+        class ReadOperation<T> where T : class, ITableEntity, new()
         {
             readonly Partition partition;
             readonly ITable table;
@@ -396,6 +301,10 @@ namespace Streamstone
             StreamSlice<T> Result((StreamEntity, IEnumerable<T>) entities)
             {
                 var (header, events) = entities;
+                if (header == null)
+                {
+                    throw new StreamNotFoundException(partition.PartitionKey, partition.Table.Name, partition.Table.StorageUri);
+                }
                 var stream = BuildStream(header);
 
                 return new StreamSlice<T>(stream, events.ToArray(), startVersion, sliceSize);

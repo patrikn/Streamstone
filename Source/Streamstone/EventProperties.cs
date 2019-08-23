@@ -2,8 +2,6 @@
 using System.Linq;
 using System.Collections.Generic;
 
-using Microsoft.Azure.Cosmos.Table;
-
 namespace Streamstone
 {
     /// <summary>
@@ -37,7 +35,7 @@ namespace Streamstone
         /// <exception cref="ArgumentNullException">
         ///     If <paramref name="properties"/> is <c>null</c>
         /// </exception>
-        public static EventProperties From(IDictionary<string, EntityProperty> properties)
+        public new static EventProperties From(IDictionary<string, EntityProperty> properties)
         {
             Requires.NotNull(properties, nameof(properties));
             return Build(Clone(properties));

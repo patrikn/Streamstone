@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -9,9 +9,6 @@ using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DataModel;
 using Amazon.DynamoDBv2.DocumentModel;
 using Amazon.DynamoDBv2.Model;
-
-using Microsoft.Azure.Cosmos.Table;
-using Microsoft.Azure.Documents.SystemFunctions;
 
 using Streamstone;
 
@@ -37,7 +34,7 @@ namespace StreamStone.DynamoDB
         public string StorageUri { get; }
         public int MaxOperationsPerChunk => 24;
 
-        public Task<TableResult> ExecuteAsync(TableOperation operation)
+        public Task ExecuteAsync(TableOperation operation)
         {
             try
             {
@@ -49,8 +46,6 @@ namespace StreamStone.DynamoDB
                         return ExecuteDeleteAsync(operation);
                     case TableOperationType.Replace:
                         return ExecuteReplaceAsync(operation);
-                    case TableOperationType.Retrieve:
-                        return ExecuteRetrieveAsync(operation);
                     default:
                         throw new ArgumentOutOfRangeException();
                 }
@@ -67,47 +62,37 @@ namespace StreamStone.DynamoDB
                 "Stream header has been changed or already exists in a storage");
         }
 
-        async Task<TableResult> ExecuteRetrieveAsync(TableOperation operation)
-        {
-            var item = await table.GetItemAsync(operation.Entity.PartitionKey, operation.Entity.RowKey);
-
-            // Only used for streams so let's simplify
-            return new TableResult()
-            {
-                Result = context.FromDocument<Stream>(item)
-            };
-        }
-
-        async Task<TableResult> ExecuteReplaceAsync(TableOperation operation)
+        async Task ExecuteReplaceAsync(TableOperation operation)
         {
             var document = ToDocument(operation);
-            await table.PutItemAsync(document, new PutItemOperationConfig()
+            try
             {
-                ConditionalExpression = new Expression()
+                await table.PutItemAsync(document, new PutItemOperationConfig()
                 {
-                    ExpressionStatement = "ETag = :etag",
-                    ExpressionAttributeValues = new Dictionary<string, DynamoDBEntry>()
+                    ConditionalExpression = new Expression()
                     {
-                        [":etag"] = operation.Entity.ETag
+                        ExpressionStatement = "ETag = :etag",
+                        ExpressionAttributeValues = new Dictionary<string, DynamoDBEntry>()
+                        {
+                            [":etag"] = operation.Entity.ETag
+                        }
                     }
-                }
-            });
+                });
+                operation.Entity.ETag = document["ETag"];
+            }
+            catch (ConditionalCheckFailedException)
+            {
+                throw new ConcurrencyConflictException(table.TableName, operation.Entity.PartitionKey, table.TableName, "ETag didn't match");
+            }
 
-            operation.Entity.ETag = document["ETag"];
-
-            return new TableResult();
         }
 
-        async Task<TableResult> ExecuteDeleteAsync(TableOperation operation)
+        async Task ExecuteDeleteAsync(TableOperation operation)
         {
             await table.DeleteItemAsync(operation.Entity.PartitionKey, operation.Entity.RowKey);
-            return new TableResult()
-            {
-                HttpStatusCode = (int) HttpStatusCode.Gone
-            };
         }
 
-        async Task<TableResult> ExecuteInsertAsync(TableOperation operation)
+        async Task ExecuteInsertAsync(TableOperation operation)
         {
             var document = ToDocument(operation);
             try
@@ -121,12 +106,6 @@ namespace StreamStone.DynamoDB
                 });
 
                 UpdateEntityAfterWrite(operation.Entity, document);
-
-                return new TableResult()
-                {
-                    HttpStatusCode = (int) HttpStatusCode.Created,
-                    Result = operation.Entity
-                };
             }
             catch (AmazonDynamoDBException e)
             {
@@ -137,50 +116,62 @@ namespace StreamStone.DynamoDB
         static void UpdateEntityAfterWrite(ITableEntity entity, Document document)
         {
             entity.ETag = document["ETag"];
-            entity.Timestamp = new DateTimeOffset(document["Timestamp"].AsDateTime());
         }
 
         Document ToDocument(TableOperation operation)
         {
-            var entity = operation.Entity.WriteEntity(new OperationContext());
-            var doc = new Document(entity.ToDictionary(kvp => kvp.Key, kvp => ToDynamoDBEntry(kvp.Value)))
-            {
-                ["PartitionKey"] = operation.Entity.PartitionKey,
-                ["RowKey"] = operation.Entity.RowKey,
-                // System generated in Azure Table Storage
-                ["ETag"] = Guid.NewGuid().ToString(),
-                ["Timestamp"] = DateTime.Now
-            };
+            var attributes = operation.Entity.WriteEntity();
+            var document = new Document(attributes.ToDictionary(kvp => kvp.Key, kvp => ToDynamoDBEntry(kvp.Value)));
+            // FIXME: document["PartitionKey"] = operation.Entity.PartitionKey,
+            // FIXME: document["RowKey"] = operation.Entity.RowKey,
+            // New etag for this version
+            document["ETag"] = Guid.NewGuid().ToString();
 
-            return doc;
+            return document;
         }
 
         DynamoDBEntry ToDynamoDBEntry(EntityProperty val)
         {
-            if (val.PropertyAsObject == null)
+            switch (val.Type)
             {
-                return DynamoDBNull.Null;
-            }
-            switch (val.PropertyType)
-            {
-                case EdmType.Boolean:
-                    return val.BooleanValue;
-                case EdmType.Binary:
-                    return val.BinaryValue;
-                case EdmType.Double:
-                    return val.DoubleValue;
-                case EdmType.Guid:
-                    return val.GuidValue;
-                case EdmType.Int32:
-                    return val.Int32Value;
-                case EdmType.Int64:
-                    return val.Int64Value;
-                case EdmType.String:
-                    return val.StringValue;
-                case EdmType.DateTime:
-                    return val.DateTime;
+                case EntityPropertyType.Binary:
+                    return val.BinaryValue();
+                case EntityPropertyType.Number:
+                    return val.NumberValue();
+                case EntityPropertyType.String:
+                    return val.StringValue();
+                case EntityPropertyType.Null:
+                    return DynamoDBNull.Null;
                 default:
-                    throw new Exception($"Unsupported type {val.PropertyType}");
+                    throw new Exception($"Unsupported type {val.Type}");
+            }
+        }
+
+        EntityProperty ToEntityProperty(DynamoDBEntry val)
+        {
+            var primitive = val.AsPrimitive();
+            if (primitive != null)
+            {
+                switch (primitive.Type)
+                {
+                    case DynamoDBEntryType.String:
+                        return (string) primitive;
+                    case DynamoDBEntryType.Numeric:
+                        return (decimal) primitive;
+                    case DynamoDBEntryType.Binary:
+                        return (byte[]) primitive;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+            // Nulls are represented with instances of DynamoDBNull
+            else if (val.AsDynamoDBNull() != null)
+            {
+                return EntityProperty.NULL;
+            }
+            else
+            {
+                throw new ArgumentException($"Unsupported DynamoDBEntry type {val}");
             }
         }
 
@@ -188,8 +179,14 @@ namespace StreamStone.DynamoDB
         {
             var items = new List<TransactWriteItem>();
             var updateEntities = new List<(ITableEntity, Document)>();
-            foreach (var op in operation)
+            foreach (TableOperation op in operation)
             {
+                var hasETagCondition = op.Entity.ETag != "*";
+                string etagCondition = "";
+                if (hasETagCondition)
+                {
+                    etagCondition = " and ETag = :ExistingETag";
+                }
                 var item = new TransactWriteItem();
                 // ReSharper disable once SwitchStatementMissingSomeCases
                 var document = ToDocument(op);
@@ -208,11 +205,13 @@ namespace StreamStone.DynamoDB
                         {
                             Item = document.ToAttributeMap(),
                             TableName = table.TableName,
-                            ConditionExpression = "attribute_exists(PartitionKey) and ETag = :ETag",
-                            ExpressionAttributeValues = new Dictionary<string, AttributeValue>()
-                            {
-                                [":ETag"] = new AttributeValue(op.Entity.ETag)
-                            }
+                            ConditionExpression = $"attribute_exists(PartitionKey){etagCondition}",
+                            ExpressionAttributeValues = hasETagCondition
+                                ? new Dictionary<string, AttributeValue>()
+                                {
+                                    [":ExistingETag"] = new AttributeValue(op.Entity.ETag)
+                                }
+                                : new Dictionary<string, AttributeValue>()
                         };
                         break;
                     case TableOperationType.InsertOrReplace:
@@ -231,10 +230,13 @@ namespace StreamStone.DynamoDB
                         break;
                     case TableOperationType.Merge:
                         var expressionAttributeValues = ExpressionAttributeValues(document);
-                        expressionAttributeValues.Add(":ExistingETag", new AttributeValue(op.Entity.ETag));
+                        if (hasETagCondition)
+                        {
+                            expressionAttributeValues.Add(":ExistingETag", new AttributeValue(op.Entity.ETag));
+                        }
                         item.Update = new Update()
                         {
-                            ConditionExpression = "attribute_exists(PartitionKey) and ETag = :ExistingETag",
+                            ConditionExpression = $"attribute_exists(PartitionKey){etagCondition}",
                             Key = ItemKey(op),
                             TableName = table.TableName,
                             UpdateExpression = UpdateExpression(document),
@@ -267,7 +269,7 @@ namespace StreamStone.DynamoDB
             {
                 await client.TransactWriteItemsAsync(request);
             }
-            catch (TransactionCanceledException e)
+            catch (Exception e)
             {
                 throw TranslateException(e, operation);
             }
@@ -278,7 +280,7 @@ namespace StreamStone.DynamoDB
             }
         }
 
-        Exception TranslateException(AmazonDynamoDBException dynamoDbException, TableBatchOperation operations)
+        Exception TranslateException(Exception dynamoDbException, TableBatchOperation operations)
         {
             if (dynamoDbException is TransactionCanceledException)
             {
@@ -286,7 +288,7 @@ namespace StreamStone.DynamoDB
                 if (startIndex > 0)
                 {
                     var items = dynamoDbException.Message.Substring(startIndex + 1, dynamoDbException.Message.Length - startIndex - 2);
-                    var errors = items.Split(new [] {","}, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray();
+                    var errors = items.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray();
                     var errIdx = Array.FindIndex(errors, e => e != "None");
                     if (errIdx >= 0)
                     {
@@ -317,7 +319,6 @@ namespace StreamStone.DynamoDB
                                     null, table.TableName, entity.GetType().Name, table.TableName, "", entity);
                             }
                         }
-
                     }
                 }
             }
@@ -379,14 +380,28 @@ namespace StreamStone.DynamoDB
             {
                 var segment = query.GetNextSetAsync().Result;
                 foreach (var res in segment)
-                    yield return context.FromDocument<TEntity>(res);
+                {
+                    var entity = ReadEntity<TEntity>(res);
+                    yield return entity;
+                }
             }
             while (!query.IsDone);
         }
 
+        TEntity ReadEntity<TEntity>(Document res) where TEntity : ITableEntity, new()
+        {
+            if (res == null)
+            {
+                return default;
+            }
+            var entity = new TEntity();
+            entity.ReadEntity(res.ToDictionary(kvp => kvp.Key, kvp => ToEntityProperty(kvp.Value)));
+            return entity;
+        }
+
         public async Task<(THeader, IEnumerable<TEvent>)> ReadRows<THeader, TEvent>(string partitionKey, string headerRowKey, string rowKeyStart, string rowKeyEnd)
             where THeader : ITableEntity, new()
-            where TEvent : new()
+            where TEvent : ITableEntity, new()
         {
             var headerPending = ReadRowAsync<THeader>(partitionKey, headerRowKey);
 
@@ -409,7 +424,7 @@ namespace StreamStone.DynamoDB
         }
 
         async Task<List<TEntity>> ReadEntitiesFromQuery<TEntity>(QueryOperationConfig queryConfig)
-            where TEntity : new()
+            where TEntity : ITableEntity, new()
         {
             var query = table.Query(queryConfig);
             var entities = new List<TEntity>();
@@ -419,7 +434,7 @@ namespace StreamStone.DynamoDB
 
                 foreach (var res in segment)
                 {
-                    entities.Add(context.FromDocument<TEntity>(res));
+                    entities.Add(ReadEntity<TEntity>(res));
                 }
             }
             while (!query.IsDone);
@@ -429,11 +444,11 @@ namespace StreamStone.DynamoDB
         public async Task<T> ReadRowAsync<T>(string partitionKey, string rowKey) where T : ITableEntity, new()
         {
             var item = await table.GetItemAsync(partitionKey, rowKey);
-            return context.FromDocument<T>(item);
+            return ReadEntity<T>(item);
         }
 
         public Task<List<T>> ReadPartition<T>(string partitionKey)
-            where T : new()
+            where T : ITableEntity, new()
         {
             return ReadEntitiesFromQuery<T>(new QueryOperationConfig()
             {

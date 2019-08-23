@@ -1,42 +1,39 @@
-﻿using System;
+﻿using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-
-using Microsoft.Azure.Cosmos.Table;
 
 namespace Streamstone
 {
-    class EventEntity : TableEntity
+    sealed class EventEntity : TableEntity
     {
         public const string RowKeyPrefix = "SS-SE-";
 
         public EventEntity()
         {
-            Properties = EventProperties.None;
+            EventProperties = EventProperties.None;
         }
 
         public EventEntity(Partition partition, RecordedEvent @event)
         {
             PartitionKey = partition.PartitionKey;
             RowKey = partition.EventVersionRowKey(@event.Version);
-            Properties = @event.Properties;
-            Version = @event.Version;   
+            EventProperties = @event.Properties;
+            Version = @event.Version;
         }
 
         public int Version                  { get; set; }
-        public EventProperties Properties   { get; set; }
+        public override PropertyMap Properties { get => EventProperties; set => EventProperties = EventProperties.From(value); }
 
-        public override void ReadEntity(IDictionary<string, EntityProperty> properties, OperationContext operationContext)
+        protected override IDictionary<string, EntityProperty> WriteCustom(IDictionary<string, EntityProperty> withProperties)
         {
-            base.ReadEntity(properties, operationContext);
-            Properties = EventProperties.ReadEntity(properties);
+            withProperties["Version"] = Version;
+            return withProperties;
         }
 
-        public override IDictionary<string, EntityProperty> WriteEntity(OperationContext operationContext)
+        protected override void ReadCustom(Dictionary<string, EntityProperty> properties)
         {
-            var result = base.WriteEntity(operationContext);
-            Properties.WriteTo(result);
-            return result;
+            Version = (int) properties["Version"].NumberValue();
         }
+
+        public EventProperties EventProperties { get; private set; }
     }
 }

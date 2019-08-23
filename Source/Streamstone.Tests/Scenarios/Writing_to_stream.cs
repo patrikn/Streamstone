@@ -6,8 +6,6 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using ExpectedObjects;
 
-using Microsoft.Azure.Cosmos.Table;
-
 namespace Streamstone.Scenarios
 {
     [TestFixture]
@@ -45,7 +43,7 @@ namespace Streamstone.Scenarios
 
             var @event = CreateEvent("e123");
 
-            partition.CaptureContents(contents =>
+            partition.CaptureContents<EventEntity>(contents =>
             {
                 Assert.ThrowsAsync<ConcurrencyConflictException>(
                     async ()=> await Stream.WriteAsync(stream, @event));
@@ -59,7 +57,7 @@ namespace Streamstone.Scenarios
         {
             await Stream.ProvisionAsync(partition);
 
-            partition.CaptureContents(contents =>
+            partition.CaptureContents<EventEntity>(contents =>
             {
                 Assert.ThrowsAsync<ConcurrencyConflictException>(
                     async () => await Stream.WriteAsync(new Stream(partition), CreateEvent()));
@@ -74,7 +72,7 @@ namespace Streamstone.Scenarios
             var stream = new Stream(partition);
 
             partition.InsertEventIdEntities("e1", "e2");
-            partition.CaptureContents(contents =>
+            partition.CaptureContents<EventEntity>(contents =>
             {
                 var duplicate = CreateEvent("e2");
 
@@ -114,7 +112,7 @@ namespace Streamstone.Scenarios
             AssertEventIdEntity("e1", 1, eventIdEntities[0]);
             AssertEventIdEntity("e2", 2, eventIdEntities[1]);
 
-            Assert.That(partition.RetrieveAll<object>().Count,
+            Assert.That(partition.RetrieveAll<EventEntity>().Count,
                 Is.EqualTo(eventEntities.Length + eventIdEntities.Length + 1));
         }
 
@@ -145,7 +143,7 @@ namespace Streamstone.Scenarios
             AssertEventIdEntity("e1", 1, eventIdEntities[0]);
             AssertEventIdEntity("e2", 2, eventIdEntities[1]);
 
-            Assert.That(partition.RetrieveAll<object>().Count,
+            Assert.That(partition.RetrieveAll<EventEntity>().Count,
                 Is.EqualTo(eventEntities.Length + eventIdEntities.Length + 1));
         }
 
@@ -175,7 +173,7 @@ namespace Streamstone.Scenarios
             var eventIdEntities = partition.RetrieveEventIdEntities();
             Assert.That(eventIdEntities.Length, Is.EqualTo(0));
 
-            Assert.That(partition.RetrieveAll<object>().Count,
+            Assert.That(partition.RetrieveAll<EventEntity>().Count,
                 Is.EqualTo(eventEntities.Length + 1));
         }
 
@@ -184,7 +182,7 @@ namespace Streamstone.Scenarios
         {
             var properties = new
             {
-                Created = DateTimeOffset.Now,
+                Created = DateTimeOffset.Now.ToString(),
                 Active = true
             };
 
@@ -214,7 +212,7 @@ namespace Streamstone.Scenarios
             AssertEventIdEntity("e1", 1, eventIdEntities[0]);
             AssertEventIdEntity("e2", 2, eventIdEntities[1]);
 
-            Assert.That(partition.RetrieveAll<object>().Count,
+            Assert.That(partition.RetrieveAll<EventEntity>().Count,
                 Is.EqualTo(eventEntities.Length + eventIdEntities.Length + 1));
         }
 
@@ -416,6 +414,15 @@ namespace Streamstone.Scenarios
         }
 
         class TestEntity : TableEntity
-        {}
+        {
+            protected override IDictionary<string, EntityProperty> WriteCustom(IDictionary<string, EntityProperty> withProperties)
+            {
+                return withProperties;
+            }
+
+            protected override void ReadCustom(Dictionary<string, EntityProperty> properties)
+            {
+            }
+        }
     }
 }

@@ -3,8 +3,6 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
-using Microsoft.Azure.Cosmos.Table;
-
 namespace Streamstone
 {
     public sealed partial class Stream
@@ -330,7 +328,7 @@ namespace Streamstone
             Partition partition,
             int startVersion = 1,
             int sliceSize = DefaultSliceSize)
-            where T : class, new()
+            where T : class, ITableEntity, new()
         {
             Requires.NotNull(partition, nameof(partition));
             Requires.GreaterThanOrEqualToOne(startVersion, nameof(startVersion));
@@ -374,37 +372,8 @@ namespace Streamstone
             var result = await new ReadOperation<EventEntity>(partition, startVersion, sliceSize)
                 .ExecuteAsync();
 
-            var eventProperties = result.Events.Select(e => e.Properties).ToArray();
+            var eventProperties = result.Events.Select(e => e.EventProperties).ToArray();
             return new StreamSlice<EventProperties>(result.Stream, eventProperties, result.HasEvents, result.IsEndOfStream);
-        }
-
-        static Func<DynamicTableEntity, T> BuildEntity<T>() where T : class, new()
-        {
-            if (typeof(T) == typeof(DynamicTableEntity))
-                return e => e as T;
-
-            return e =>
-            {
-                var t = new T();
-
-                if (t is ITableEntity entity)
-                {
-                    entity.ReadEntity(e.Properties, new OperationContext());
-                    entity.PartitionKey = e.PartitionKey;
-                    entity.RowKey = e.RowKey;
-                    entity.ETag = e.ETag;
-                    entity.Timestamp = e.Timestamp;
-                    return t;
-                }
-
-                TableEntity.ReadUserObject(t, e.Properties, new OperationContext());
-                return t;
-            };
-        }
-
-        static EventProperties BuildEventProperties(DynamicTableEntity e)
-        {
-            return EventProperties.ReadEntity(e.Properties);
         }
     }
 }

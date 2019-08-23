@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Linq;
 
-using Microsoft.Azure.Cosmos.Table;
-
 namespace Streamstone
 {
     /// <summary>
