@@ -278,7 +278,7 @@ namespace Streamstone
             }
         }
 
-        class ReadOperation<T> where T : class, ITableEntity, new()
+        class ReadOperation<T> where T : class, new()
         {
             readonly Partition partition;
             readonly ITable table;

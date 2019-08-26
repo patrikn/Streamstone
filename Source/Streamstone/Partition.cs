@@ -97,7 +97,7 @@ namespace Streamstone
         [CanBeNull]
         public async Task<(THeader, IEnumerable<TEvent>)> ReadSlice<THeader, TEvent>(int startVersion, int sliceSize)
             where THeader : ITableEntity, new()
-            where TEvent : ITableEntity, new()
+            where TEvent : new()
         {
             var rowKeyStart = EventVersionRowKey(startVersion);
             var rowKeyEnd = EventVersionRowKey(startVersion + sliceSize - 1);

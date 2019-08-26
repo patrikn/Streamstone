@@ -328,7 +328,7 @@ namespace Streamstone
             Partition partition,
             int startVersion = 1,
             int sliceSize = DefaultSliceSize)
-            where T : class, ITableEntity, new()
+            where T : class, new()
         {
             Requires.NotNull(partition, nameof(partition));
             Requires.GreaterThanOrEqualToOne(startVersion, nameof(startVersion));

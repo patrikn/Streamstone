@@ -20,7 +20,7 @@ namespace Streamstone
 
         Task<(THeader, IEnumerable<TEvent>)> ReadRows<THeader, TEvent>(string partitionKey, string headerRowKey, string rowKeyStart, string rowKeyEnd)
             where THeader : ITableEntity, new()
-            where TEvent : ITableEntity, new();
+            where TEvent : new();
 
         Task<T> ReadRowAsync<T>(string partitionKey, string rowKey)
             where T : ITableEntity, new();

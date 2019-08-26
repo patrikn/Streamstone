@@ -401,7 +401,7 @@ namespace StreamStone.DynamoDB
 
         public async Task<(THeader, IEnumerable<TEvent>)> ReadRows<THeader, TEvent>(string partitionKey, string headerRowKey, string rowKeyStart, string rowKeyEnd)
             where THeader : ITableEntity, new()
-            where TEvent : ITableEntity, new()
+            where TEvent : new()
         {
             var headerPending = ReadRowAsync<THeader>(partitionKey, headerRowKey);
 
@@ -424,7 +424,7 @@ namespace StreamStone.DynamoDB
         }
 
         async Task<List<TEntity>> ReadEntitiesFromQuery<TEntity>(QueryOperationConfig queryConfig)
-            where TEntity : ITableEntity, new()
+            where TEntity : new()
         {
             var query = table.Query(queryConfig);
             var entities = new List<TEntity>();
@@ -434,7 +434,7 @@ namespace StreamStone.DynamoDB
 
                 foreach (var res in segment)
                 {
-                    entities.Add(ReadEntity<TEntity>(res));
+                    entities.Add(context.FromDocument<TEntity>(res));
                 }
             }
             while (!query.IsDone);
